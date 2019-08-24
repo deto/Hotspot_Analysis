@@ -1,0 +1,36 @@
+subworkflow data:
+    workdir:
+        "../../data/SlideSeq/Puck_180819_12"
+
+include: "../Snakefile"
+
+rule timeHotspot:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli',
+        N_GENES='{N_GENES}',
+        N_CELLS='{N_CELLS}',
+    threads: 16
+    output:
+        results="hotspot/timing/{N_GENES}_{N_CELLS}_timing.txt"
+    script: "../../pipelineScripts/hotspot/timeHotspot.py"
+
+rule timeSpatialDE:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        N_GENES='{N_GENES}',
+        N_CELLS='{N_CELLS}',
+    threads: 16
+    output:
+        results="spatialDE/timing/{N_GENES}_{N_CELLS}_timing.txt"
+    script: "../../pipelineScripts/SpatialDE/timeSpatialDe.py"
+
+
+rule timings:
+    input: 
+        expand(rules.timeHotspot.output.results, N_GENES=[500, 1000, 2000, 4000], N_CELLS=[5000, 10000, 20000]),
+        expand(rules.timeSpatialDE.output.results, N_GENES=[500, 1000, 2000, 4000], N_CELLS=[5000, 10000, 20000]),

@@ -1,0 +1,5 @@
+subworkflow data:
+    workdir:
+        "../../data/SlideSeq/Puck_180819_9"
+
+include: "../Snakefile"

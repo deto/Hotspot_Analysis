@@ -1,0 +1,19 @@
+
+# Here the Puck data must be downloaded from the Broad
+# portal: 
+#   https://portals.broadinstitute.org/single_cell/study/SCP354/slide-seq-study#study-summary
+#
+# Download Puck_180819_12
+
+
+rule parse_data:
+    input:
+        dge="../Puck_180819_14_raw/MappedDGEForR.csv",
+        pos="../Puck_180819_14_raw/BeadMapping_10-17_1311/BeadLocationsForR.csv",
+    output:
+        loom=protected("data.loom")
+    script: "../parse.py"
+
+rule all:
+    input:
+        expand(rules.parse_data.output),

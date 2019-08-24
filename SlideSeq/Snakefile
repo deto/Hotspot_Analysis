@@ -1,0 +1,120 @@
+# rule SCVI:
+#     message: "Running scVI"
+#     input:
+#         exp=rules.extract_data.output.counts,
+#         meta=rules.extract_data.output.meta,
+#     params:
+#         has_batch=False,
+#         filterType='Fano',
+#         filterParam1=10,
+#         filterParam2=1.5,
+#         components=10,
+#         zinb=False,
+#     output:
+#         model="scvi/model.pkl",
+#         model_genes="scvi/model_genes.txt",
+#         latent="scvi/latent.txt.gz",
+#         batch_encoding="scvi/batch_encoding.txt",
+#     script: "../pipelineScripts/scvi/scviTorch.py"
+
+rule select_all:
+    input:
+        loom=data("data.loom"),
+    output:
+        genes="all/genes.txt"
+    script: "../pipelineScripts/select_all.py"
+
+rule PCA:
+    message: "Computing PCA"
+    input:
+        loom=data("data.loom"),
+        genes="all/genes.txt"
+    output:
+        latent="pca/pca.txt",
+    script: "../pipelineScripts/pca/pca.py"
+
+rule TSNE:
+    message: "Computing TSNE"
+    input:
+        latent=rules.PCA.output.latent,
+    output:
+        out="tsne/tsne.txt",
+    script: "../pipelineScripts/tsne/tsne.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap.txt",
+        out3="umap/umap3.txt",
+    script: "../pipelineScripts/umap/umap.py"
+
+rule extractPositions:
+    input:
+        loom=data("data.loom")
+    output:
+        positions="positions/positions.txt"
+    script: "../pipelineScripts/extractPositions.py"
+
+rule runHotspot:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli'
+    output:
+        results="hotspot/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspotPairs:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        hs_results=rules.runHotspot.output.results,
+    params:
+        model='bernoulli',
+        fdrThresh=0.05,
+    output:
+        results_lc="hotspot/hotspot_pairs_lc.txt.gz",
+        results_z="hotspot/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule spatialDE:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    threads: 10
+    output:
+        results="spatialDE/spatialDE.txt"
+    script: "../pipelineScripts/SpatialDE/runSpatialDE.py"
+
+rule spatialDEClusters:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        sde_results=rules.spatialDE.output.results,
+    output:
+        hist="spatialDE/histology.txt",
+        patterns="spatialDE/patterns.txt",
+    script: "../pipelineScripts/SpatialDE/runSpatialDECluster.py"
+
+rule vision:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        proj_positions=rules.extractPositions.output.positions,
+        tsne=rules.TSNE.output.out,
+        umap=rules.UMAP.output.out,
+    output:
+        out="vision/vision.rds"
+    script: "../pipelineScripts/Vision/vision.R"
+
+rule all:
+    input:
+        rules.UMAP.output.out,
+        rules.TSNE.output.out,
+        rules.vision.output.out,
+        rules.runHotspotPairs.output,

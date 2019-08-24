@@ -1,0 +1,29 @@
+
+rule download_data:
+    output:
+        "GSE100866_PBMC_vs_flow_10X-ADT_clr-transformed.csv.gz",
+        "GSE100866_PBMC_vs_flow_10X-ADT_umi.csv.gz",
+        "GSE100866_PBMC_vs_flow_10X-RNA_umi.csv.gz",
+    shell:
+        """
+        wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE100866&format=file&file=GSE100866%5FPBMC%5Fvs%5Fflow%5F10X%2DADT%5Fclr%2Dtransformed%2Ecsv%2Egz" -O GSE100866_PBMC_vs_flow_10X-ADT_clr-transformed.csv.gz
+        wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE100866&format=file&file=GSE100866%5FPBMC%5Fvs%5Fflow%5F10X%2DADT%5Fumi%2Ecsv%2Egz" -O GSE100866_PBMC_vs_flow_10X-ADT_umi.csv.gz
+        wget "https://www.ncbi.nlm.nih.gov/geo/download/?acc=GSE100866&format=file&file=GSE100866%5FPBMC%5Fvs%5Fflow%5F10X%2DRNA%5Fumi%2Ecsv%2Egz" -O GSE100866_PBMC_vs_flow_10X-RNA_umi.csv.gz
+        """
+
+rule parse_data:
+    input:
+        counts="GSE100866_PBMC_vs_flow_10X-RNA_umi.csv.gz",
+        adt="GSE100866_PBMC_vs_flow_10X-ADT_umi.csv.gz",
+        adt_clr="GSE100866_PBMC_vs_flow_10X-ADT_clr-transformed.csv.gz",
+    output:
+        scaled="expression_scaled.feather",
+        counts="expression_counts.feather",
+        meta="meta.txt.gz",
+        adt="adt.txt.gz",
+        adt_clr="adt_clr.txt.gz",
+    script: "parse.py"
+
+rule all:
+    input:
+        expand(rules.parse_data.output),

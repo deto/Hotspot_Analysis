@@ -1,0 +1,71 @@
+# rule SCVI:
+#     message: "Running scVI"
+#     input:
+#         exp=rules.extract_data.output.counts,
+#         meta=rules.extract_data.output.meta,
+#     params:
+#         has_batch=False,
+#         filterType='Fano',
+#         filterParam1=10,
+#         filterParam2=1.5,
+#         components=10,
+#         zinb=False,
+#     output:
+#         model="scvi/model.pkl",
+#         model_genes="scvi/model_genes.txt",
+#         latent="scvi/latent.txt.gz",
+#         batch_encoding="scvi/batch_encoding.txt",
+#     script: "../pipelineScripts/scvi/scviTorch.py"
+
+subworkflow data:
+    workdir:
+        "../data/10x_PBMC/"
+
+rule select_all:
+    input:
+        loom=data("data.loom"),
+    output:
+        genes="all/genes.txt"
+    script: "../pipelineScripts/select_all.py"
+
+rule select_hvg:
+    input:
+        expression=data("expression_counts.feather"),
+    params:
+        doXcutoff=True,
+    output:
+        genes="hvg/genes.txt"
+    script: "../pipelineScripts/select_hvg.R"
+
+rule PCA:
+    message: "Computing PCA"
+    input:
+        loom=data("data.loom"),
+        genes="{filter}/genes.txt"
+    output:
+        latent="{filter}/pca.txt",
+    script: "../pipelineScripts/pca/pca.py"
+
+rule TSNE:
+    message: "Computing TSNE"
+    input:
+        latent=rules.PCA.output.latent,
+    output:
+        out="{filter}/tsne.txt",
+    script: "../pipelineScripts/tsne/tsne.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap.txt",
+        out3="umap/umap3.txt",
+    script: "../pipelineScripts/umap/umap.py"
+
+rule all:
+    input:
+        expand(rules.TSNE.output.out,
+            filter=['all']),

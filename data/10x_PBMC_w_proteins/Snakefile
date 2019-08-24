@@ -1,0 +1,32 @@
+
+rule download_data:
+    output:
+        h5="raw/5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5"
+    shell:
+        """
+        mkdir -p raw
+        cd raw
+        wget http://cf.10xgenomics.com/samples/cell-exp/3.0.2/5k_pbmc_protein_v3/5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5 
+        """
+
+rule parse_data:
+    input:
+        h5=rules.download_data.output.h5
+    output:
+        loom=protected("data.loom"),
+        ab="ab.txt.gz",
+    script: "parse.py"
+
+rule parse_data_cd4:
+    input:
+        loom=rules.parse_data.output.loom,
+        ab=rules.parse_data.output.ab,
+    output:
+        loom=protected("cd4/data.loom"),
+        ab="cd4/ab.txt.gz",
+    script: "parse_cd4.py"
+
+rule all:
+    input:
+        expand(rules.parse_data.output),
+        expand(rules.parse_data_cd4.output),
