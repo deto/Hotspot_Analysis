@@ -1,0 +1,29 @@
+# Taken from: https://portals.broadinstitute.org/single_cell/study/SCP354/slide-seq-study#study-summary
+
+Hello!  To view Slide-seq data from our paper (Rodriques*, Stickels* et al 2019), click on the "Download" link above.  You will need to be logged in to the Single Cell Portal to obtain access.
+ 
+
+Within a given puck directory, the DGE (counts of gene transcripts on each bead) and bead barcode locations are available as csv file format: MappedDGEForR.csv and MappedLocationsForR.csv, respectively.
+
+If you are looking to analyze your data with matlab, the core data for the puck, including the DGE, gene names, and bead locations, is stored in BijectiveMapping.mat within the BeadMapping folder. Bead locations are retrieved as [UniqueMappedBeads.Locations] after loading that .mat file. We strongly recommend using the library of functions we have built for the purpose, available at our github site below. 
+
+The base calling data for each puck is stored in a folder entitled "Puck_YYMMDD_NN", where YYMMDD is the day it was made, and NN is a number assigned to that puck. Within the Puck_YYMMDD directory, there is a BeadMapping directory, of the form BeadMapping_M-D_hhmm, where M and D are the month and date (either 1 or 2 digits), hh is an hour and mm is a minute marker. This denotes the time when the mapping between solid barcodes and illumina barcodes was run, to prevent future mappings from overwriting old mappings. For pucks that were mapped to illumina data after December 2018, the form is BeadMapping_YYYY_M-D_hhmm
+
+ 
+
+We've highlighted a few pucks that represent the different analyses we performed in the paper--they are specially named and appear at the top of the "Download" section.
+
+To look up a specific puck ID from our study, refer to Table S3 in our supplement (page 40 of the file below):
+
+http://science.sciencemag.org/content/sci/suppl/2019/03/27/363.6434.1463.DC1/aaw1219_Rodriques_SM.pdf
+
+ 
+
+If you're interested in bulk data downloads, please contact us at slideseq [at] googlegroups.com.
+
+ 
+
+For more information, visit our github site:
+
+https://github.com/broadchenf/Slideseq/tree/master/BeadSeq%20Code
+
