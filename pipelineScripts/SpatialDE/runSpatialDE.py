@@ -48,12 +48,27 @@ norm_expr = NaiveDE.stabilize(counts.T).T
 resid_expr = NaiveDE.regress_out(
     sample_info, norm_expr.T, 'np.log(total_counts)').T
 
-
 X = sample_info[['Comp1', 'Comp2']].values
+
+# Override the ranges that spatialDE uses
+# These mess up on some of the pucks and result in ridiculous values
+from SpatialDE.base import get_l_limits
+l_min, l_max = get_l_limits(X)
+
+try:
+    l_min = snakemake.params['l_min']
+except AttributeError:
+    pass
+
+print(l_min, l_max)
+kernel_space = {
+    'SE': np.logspace(np.log10(l_min), np.log10(l_max), 10),
+    'const': 0
+}
 
 
 print('Running SpatialDE...')
-results = SpatialDE.run(X, resid_expr)
+results = SpatialDE.run(X, resid_expr, kernel_space=kernel_space)
 
 print('Saving Results...')
 results = results.set_index('g')

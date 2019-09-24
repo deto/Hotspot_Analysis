@@ -1,0 +1,62 @@
+rule select_threshold:
+    input:
+        loom=data("cd4/data.loom"),
+    params:
+        N_CELLS=10,
+    output:
+        genes="genes/threshold.txt"
+    script: "../pipelineScripts/select_threshold.py"
+
+rule PCA_threshold:
+    message: "Computing PCA on thresholded genes"
+    input:
+        loom=data("cd4/data.loom"),
+        genes=rules.select_threshold.output.genes,
+    output:
+        latent="pca/pca_threshold.txt",
+    script: "../pipelineScripts/pca/pca.py"
+
+rule TSNE_threshold:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    output:
+        out="tsne/tsne_threshold.txt",
+    script: "../pipelineScripts/tsne/tsne.py"
+
+rule cluster_threshold:
+    message: "Creating clusters on PCA-threshold"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+        tsne=rules.TSNE_threshold.output.out,
+    params:
+        n_neighbors=30,
+        resolution=1,
+    output:
+        cluster_colors="clusters/cluster_colors_threshold.json",
+        cluster_plot="clusters/cluster_threshold.png",
+        clusters="clusters/clusters_threshold.txt",
+    script: "../pipelineScripts/cluster/makeClusters.py"
+
+rule cluster_markers_threshold:
+    message: "Finding cluster markers on PCA-threshold"
+    input:
+        loom=data("cd4/data.loom"),
+        clusters=rules.cluster_threshold.output.clusters,
+    output:
+        out="clusters/markers_threshold.txt.gz",
+        out_xlsx="clusters/markers_threshold.xlsx",
+    script: "../pipelineScripts/cluster/cluster_de_1vAll_edgeR.R"
+
+rule runHotspot_threshold:
+    input:
+        loom=data("cd4/data.loom"),
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_pca_threshold.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+

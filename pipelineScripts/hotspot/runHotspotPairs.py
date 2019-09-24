@@ -12,6 +12,12 @@ out_file_lcz = snakemake.output['results_z']
 model = snakemake.params['model']
 
 fdrThresh = snakemake.params['fdrThresh']
+n_neighbors = snakemake.params['n_neighbors']
+
+try:
+    topN = int(snakemake.params['topN'])
+except AttributeError:
+    topN = None
 
 with loompy.connect(loom_file, 'r') as ds:
     barcodes = ds.ca['Barcode'][:]
@@ -37,13 +43,18 @@ num_umi = num_umi[latent.index]
 hs = hotspot.Hotspot(counts, latent, num_umi)
 
 hs.create_knn_graph(
-    weighted_graph=False, n_neighbors=30, neighborhood_factor=3
+    weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
 )
 
 
-hs_genes = hs_results.index[hs_results.FDR < fdrThresh]
+if topN is None:
+    hs_genes = hs_results.index[hs_results.FDR < fdrThresh]
+else:
+    hs_genes = hs_results.sort_values('Z').tail(topN).index
 
-lc, lcz = hs.compute_modules(hs_genes, model=model, centered=False, jobs=20)
+hs_genes = hs_genes & counts.index
+
+lc, lcz = hs.compute_modules(hs_genes, model=model, centered=True, jobs=20)
 
 lc.to_csv(out_file_lc, sep="\t", compression="gzip")
 lcz.to_csv(out_file_lcz, sep="\t", compression="gzip")

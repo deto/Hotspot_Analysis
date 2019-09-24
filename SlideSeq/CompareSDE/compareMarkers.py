@@ -39,22 +39,24 @@ print(len(all_markers))
 print(len(all_markers_norm))
 
 
-# %% Load some data to make a ROC curve
+# %% Define some lists...
 
 
 hs_files = [
-    "../Puck_180819_9/hotspot/hotspot.txt",
-    "../Puck_180819_10/hotspot/hotspot.txt",
-    "../Puck_180819_11/hotspot/hotspot.txt",
-    "../Puck_180819_12/hotspot/hotspot.txt",
+    "../Puck_180819_9/hotspot/hotspot_300.txt",
+    "../Puck_180819_10/hotspot/hotspot_300.txt",
+    "../Puck_180819_11/hotspot/hotspot_300.txt",
+    "../Puck_180819_12/hotspot/hotspot_300.txt",
 ]
 
 sde_files = [
-    "../Puck_180819_9/spatialDE/spatialDE.txt",
-    "../Puck_180819_10/spatialDE/spatialDE.txt",
-    "../Puck_180819_11/spatialDE/spatialDE.txt",
-    "../Puck_180819_12/spatialDE/spatialDE.txt",
+    "../Puck_180819_9/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_10/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_11/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_12/spatialDE/spatialDE_fixed.txt",
 ]
+
+# %% Make a ROC Curve
 
 aucs = []
 
@@ -247,3 +249,69 @@ auprs = pd.DataFrame(auprs, columns=['AUPR', 'Method'])
 sns.stripplot(x='Method', y='AUPR', data=auprs)
 #plt.ylim(0, 1)
 plt.show()
+
+# %% Now create the final figure
+
+auprs = []
+
+fig, axs = plt.subplots(
+    1, 2,
+    gridspec_kw={
+        'width_ratios': [2, 1],
+        'wspace': .5,
+    }
+)
+plt.sca(axs[0])
+
+for ff in hs_files:
+    res = pd.read_table(ff, index_col=0)
+
+    y_score = res.Z.values
+    y_true = np.array(
+        [x.upper() in all_markers_norm for x in res.index]
+    ).astype('int')
+
+    precision, recall, thresholds = precision_recall_curve(y_true, y_score)
+
+    aupr = auc(recall, precision)
+    auprs.append([aupr, 'Hotspot'])
+
+    label = 'Hotspot' if ff == hs_files[-1] else None
+    plt.plot(recall, precision, color='blue', label=label)
+
+for ff in sde_files:
+    res = pd.read_table(ff, index_col=0)
+
+    y_score = res.LLR.values
+    y_true = np.array(
+        [x.upper() in all_markers_norm for x in res.index]
+    ).astype('int')
+
+    precision, recall, thresholds = precision_recall_curve(y_true, y_score)
+
+    aupr = auc(recall, precision)
+    auprs.append([aupr, 'spatialDE'])
+
+    label = 'spatialDE' if ff == sde_files[-1] else None
+    plt.plot(recall, precision, color='green', label=label)
+
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.xlim(0, 1)
+plt.ylim(0, 1)
+axs[0].set_axisbelow(True)
+plt.grid(color='#CCCCCC', dashes=[3, 3], lw=1)
+plt.legend()
+
+plt.sca(axs[1])
+auprs = pd.DataFrame(auprs, columns=['AUPR', 'Method'])
+
+sns.stripplot(x='Method', y='AUPR', data=auprs, jitter=True)
+plt.ylim(0, .6)
+plt.xlabel('')
+axs[1].set_axisbelow(True)
+plt.grid(color='#CCCCCC', axis='y', dashes=[3, 3], lw=1)
+plt.xticks(rotation=70)
+plt.subplots_adjust(bottom=0.2)
+#plt.show()
+plt.savefig('AUPRs.svg')

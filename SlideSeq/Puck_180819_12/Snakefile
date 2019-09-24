@@ -4,12 +4,197 @@ subworkflow data:
 
 include: "../Snakefile"
 
+rule select_threshold:
+    input:
+        loom=data("data.loom"),
+    params:
+        N_CELLS=50,
+    output:
+        genes="genes/threshold.txt"
+    script: "../../pipelineScripts/select_threshold.py"
+
+rule PCA_threshold:
+    message: "Computing PCA on thresholded genes"
+    input:
+        loom=data("data.loom"),
+        genes=rules.select_threshold.output.genes,
+    output:
+        latent="pca/pca_threshold.txt",
+    script: "../../pipelineScripts/pca/pca.py"
+
+rule TSNE_threshold:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    output:
+        out="tsne/tsne_threshold.txt",
+    script: "../../pipelineScripts/tsne/tsne.py"
+
+rule cluster_threshold:
+    message: "Creating clusters on PCA-threshold"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+        tsne=rules.TSNE_threshold.output.out,
+    params:
+        n_neighbors=30,
+        resolution=1,
+    output:
+        cluster_colors="clusters/cluster_colors_threshold.json",
+        cluster_plot="clusters/cluster_threshold.png",
+        clusters="clusters/clusters_threshold.txt",
+    script: "../../pipelineScripts/cluster/makeClusters.py"
+
+rule cluster_markers_threshold:
+    message: "Finding cluster markers on PCA-threshold"
+    input:
+        loom=data("data.loom"),
+        clusters=rules.cluster_threshold.output.clusters,
+    output:
+        out="clusters/markers_threshold.txt.gz",
+        out_xlsx="clusters/markers_threshold.xlsx",
+    script: "../../pipelineScripts/cluster/cluster_de_1vAll_edgeR.R"
+
+rule runHotspot_threshold:
+    input:
+        loom=data("data.loom"),
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        model='bernoulli',
+        n_neighbors=300,
+    output:
+        results="hotspot/hotspot_pca_threshold.txt"
+    script: "../../pipelineScripts/hotspot/runHotspot.py"
+
+rule select_hvg:
+    input:
+        loom=data("data.loom"),
+    params:
+        lowXcutoff=0.5,
+    output:
+        genes="genes/hvg.txt"
+    script: "../../pipelineScripts/select_hvg.R"
+
+rule PCA_hvg:
+    message: "Computing PCA on highly-variable genes"
+    input:
+        loom=data("data.loom"),
+        genes=rules.select_hvg.output.genes,
+    output:
+        latent="pca/pca_hvg.txt",
+    script: "../../pipelineScripts/pca/pca.py"
+
+rule TSNE_hvg:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_hvg.output.latent,
+    output:
+        out="tsne/tsne_hvg.txt",
+    script: "../../pipelineScripts/tsne/tsne.py"
+
+rule cluster_hvg:
+    message: "Creating clusters on PCA-hvg"
+    input:
+        latent=rules.PCA_hvg.output.latent,
+        tsne=rules.TSNE_hvg.output.out,
+    params:
+        n_neighbors=30,
+        resolution=1,
+    output:
+        cluster_colors="clusters/cluster_colors_hvg.json",
+        cluster_plot="clusters/cluster_hvg.png",
+        clusters="clusters/clusters_hvg.txt",
+    script: "../../pipelineScripts/cluster/makeClusters.py"
+
+rule cluster_markers_hvg:
+    message: "Finding cluster markers on PCA-hvg"
+    input:
+        loom=data("data.loom"),
+        clusters=rules.cluster_hvg.output.clusters,
+    output:
+        out="clusters/markers_hvg.txt.gz",
+        out_xlsx="clusters/markers_hvg.xlsx",
+    script: "../../pipelineScripts/cluster/cluster_de_1vAll_edgeR.R"
+
+rule runHotspot_hvg:
+    input:
+        loom=data("data.loom"),
+        latent=rules.PCA_hvg.output.latent,
+    params:
+        model='bernoulli',
+        n_neighbors=300,
+    output:
+        results="hotspot/hotspot_pca_hvg.txt"
+    script: "../../pipelineScripts/hotspot/runHotspot.py"
+
+rule shufflePositions:
+    input:
+        positions=rules.extractPositions.output.positions,
+    output:
+        positions="positions/positions_shuffled.txt"
+    script: "../../pipelineScripts/shufflePositions.py"
+
+rule runHotspot_shuffled:
+    input:
+        loom=data("data.loom"),
+        latent=rules.shufflePositions.output.positions,
+    params:
+        model='bernoulli',
+        n_neighbors=300,
+    output:
+        results="hotspot/hotspot_shuffled.txt"
+    script: "../../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot_shuffled_linear:
+    input:
+        loom=data("data.loom"),
+        latent=rules.shufflePositions.output.positions,
+    params:
+        model='bernoulli_L',
+        n_neighbors=300,
+    output:
+        results="hotspot/hotspot_shuffled_linear.txt"
+    script: "../../pipelineScripts/hotspot/runHotspot.py"
+
+rule spatialDE_shuffled:
+    input:
+        loom=data("data.loom"),
+        latent=rules.shufflePositions.output.positions,
+    params:
+        l_min=50,
+    threads: 10
+    output:
+        results="spatialDE/spatialDE_shuffled.txt"
+    script: "../../pipelineScripts/SpatialDE/runSpatialDE.py"
+
+rule windowPositions:
+    input:
+        positions=rules.extractPositions.output.positions,
+    params:
+        xmin=3500,
+        xmax=6000,
+        ymin=-4600,
+        ymax=-1000,
+    output:
+        positions="positions/positions_windowed.txt"
+    script: "../../pipelineScripts/windowPositions.py"
+
+rule spatialDEClusters_windowed:
+    input:
+        loom=data("data.loom"),
+        latent=rules.windowPositions.output.positions,
+        sde_results=rules.spatialDE.output.results,
+    output:
+        hist="spatialDE/histology_windowed.txt",
+        patterns="spatialDE/patterns_windowed.txt",
+    script: "../../pipelineScripts/SpatialDE/runSpatialDECluster.py"
+
 rule timeHotspot:
     input:
         loom=data("data.loom"),
         latent=rules.extractPositions.output.positions,
     params:
         model='bernoulli',
+        n_neighbors=300,
         N_GENES='{N_GENES}',
         N_CELLS='{N_CELLS}',
     threads: 16
@@ -28,7 +213,6 @@ rule timeSpatialDE:
     output:
         results="spatialDE/timing/{N_GENES}_{N_CELLS}_timing.txt"
     script: "../../pipelineScripts/SpatialDE/timeSpatialDe.py"
-
 
 rule timings:
     input: 

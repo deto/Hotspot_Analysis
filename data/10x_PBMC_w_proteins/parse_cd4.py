@@ -44,14 +44,25 @@ is_cd4 = (
     (ab_clr['CD14'] < 2) &
     (ab_clr['CD4'] > 3) &
     (ab_clr['CD3'] > 2.5)
+).values
+
+# Further filter by MitoPercent and NumUmi
+with loompy.connect(in_loom, 'r') as ds:
+    num_umi = ds.ca['NumUmi'][:]
+    mito_percent = ds.ca['MitoPercent'][:]
+
+is_healthy = (
+    (num_umi > 3100) &
+    (mito_percent < 16)
 )
 
+is_cd4 = is_cd4 & is_healthy
 
 ab_cd4 = ab.loc[is_cd4]
 
 with loompy.connect(in_loom, mode='r') as ds:
     with loompy.new(out_loom) as ds_out:
-        view = ds.view[:, is_cd4.values]
+        view = ds.view[:, is_cd4]
         ds_out.add_columns(view.layers, col_attrs=view.ca, row_attrs=view.ra)
 
 ab_cd4.to_csv(out_ab, sep="\t", compression='gzip')

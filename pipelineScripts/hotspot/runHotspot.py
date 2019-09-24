@@ -8,6 +8,17 @@ out_file = snakemake.output['results']
 
 model = snakemake.params['model']
 
+
+try:
+    n_neighbors = snakemake.params['n_neighbors']
+except AttributeError:
+    n_neighbors = 30
+
+try:
+    n_cells_min = snakemake.params['n_cells_min']
+except AttributeError:
+    n_cells_min = 50
+
 with loompy.connect(loom_file, 'r') as ds:
     barcodes = ds.ca['Barcode'][:]
     counts = ds[:, :]
@@ -28,16 +39,16 @@ num_umi = num_umi[latent.index]
 
 # need counts, latent, and num_umi
 
-valid_genes = (counts > 0).sum(axis=1) > 50
+valid_genes = (counts > 0).sum(axis=1) > n_cells_min
 counts = counts.loc[valid_genes]
 
 hs = hotspot.Hotspot(counts, latent, num_umi)
 
 hs.create_knn_graph(
-    weighted_graph=False, n_neighbors=30, neighborhood_factor=3
+    weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
 )
 
-results = hs.compute_hotspot(model=model, jobs=2, centered=True)
+results = hs.compute_hotspot(model=model, jobs=5, centered=True)
 
 results = gene_info.join(results, how='right')
 

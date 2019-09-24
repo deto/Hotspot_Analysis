@@ -103,5 +103,5 @@ ll = Legend(ax, lines, [l.get_label() for l in lines], loc='upper left',
             bbox_to_anchor=(1, 1), title='Method')
 ax.add_artist(ll)
 
-#plt.show()
-plt.savefig('Timing.svg')
+plt.show()
+#plt.savefig('Timing.svg')

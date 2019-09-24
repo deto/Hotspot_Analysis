@@ -87,6 +87,15 @@ proteins_df = pd.DataFrame(
     columns=barcodes.astype('str')
 ).T
 
+# Other Stats
+
+mito_genes = [x.lower().startswith('mt-') for x in features_genes.Name.values.astype('str')]
+mito_genes = np.array(mito_genes)
+
+mito_count = np.array(mRNA[mito_genes].sum(axis=0)).ravel()
+mito_percent = mito_count / num_umi * 100
+
+
 # Save results
 
 row_attrs = {
@@ -98,6 +107,7 @@ col_attrs = {
     "Barcode": barcodes,
     "NumUmi": num_umi,
     "NumAb": num_ab,
+    "MitoPercent": mito_percent,
 }
 
 layers = {

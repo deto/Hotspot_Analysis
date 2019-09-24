@@ -13,6 +13,7 @@ os.makedirs(os.path.dirname(out_file), exist_ok=True)
 
 N_CELLS = int(snakemake.params['N_CELLS'])
 N_GENES = int(snakemake.params['N_GENES'])
+N_NEIGHBORS = int(snakemake.params['n_neighbors'])
 N_JOBS = snakemake.threads
 
 model = snakemake.params['model']
@@ -57,7 +58,7 @@ start = time.time()
 hs = hotspot.Hotspot(counts, latent, num_umi)
 
 hs.create_knn_graph(
-    weighted_graph=False, n_neighbors=30, neighborhood_factor=3
+    weighted_graph=False, n_neighbors=N_NEIGHBORS, neighborhood_factor=3
 )
 
 results = hs.compute_hotspot(model=model, jobs=N_JOBS, centered=True)

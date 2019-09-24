@@ -59,6 +59,7 @@ plt.ylabel('Genes Above IDR')
 plt.legend([handle[0], handle1[0]], ['Hotspot', 'SpatialDE'])
 plt.grid(color='#dddddd', dashes=(6, 6))
 plt.savefig('IDR_pairs.svg')
+#plt.show()
 
 # %%
 
@@ -85,3 +86,4 @@ plt.xlabel('IDR ($-log_{10}$)')
 plt.ylabel('Genes Above IDR')
 plt.grid(color='#dddddd', dashes=(6, 6))
 plt.savefig('IDR_Multi.svg')
+#plt.show()

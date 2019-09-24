@@ -10,18 +10,23 @@ dir.create(out_dir, showWarnings = FALSE)
 ds <- connect(filename = loom_file, mode = "r")
 
 expression <- t(ds$layers$scaled[, ])
-barcodes <- ds$col.attrs$Barcode[]
-num_umi <- ds$col.attrs$NumUmi[]
+
+meta <- lapply(
+    setNames(names(ds$col.attrs), names(ds$col.attrs)),
+    function(col) {
+        ds$col.attrs[[col]][]
+    })
+meta <- data.frame(meta)
+rownames(meta) <- meta$Barcode
+meta$Barcode <- NULL
+meta$LogNumUmi <- log10(meta$NumUmi)
 
 gene_symbols <- ds$row.attrs$Symbol[]
 
 ds$close_all()
 
 expression <- convertGeneIds(expression, gene_symbols)
-colnames(expression) <- barcodes
-
-meta <- data.frame(NumUmi = num_umi, LogNumUmi = log10(num_umi))
-rownames(meta) <- barcodes
+colnames(expression) <- rownames(meta)
 
 sigs <- list()
 

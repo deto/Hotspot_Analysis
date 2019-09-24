@@ -1,0 +1,46 @@
+rule select_all:
+    input:
+        loom=data("cd4/data.loom"),
+    output:
+        genes="genes/all.txt"
+    script: "../pipelineScripts/select_all.py"
+
+rule PCA:
+    message: "Computing PCA"
+    input:
+        loom=data("cd4/data.loom"),
+        genes=rules.select_all.output.genes,
+    output:
+        latent="pca/pca_all.txt",
+    script: "../pipelineScripts/pca/pca.py"
+
+rule TSNE:
+    message: "Computing TSNE"
+    input:
+        latent=rules.PCA.output.latent,
+    output:
+        out="tsne/tsne.txt",
+    script: "../pipelineScripts/tsne/tsne.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap.txt",
+        out3="umap/umap3.txt",
+    script: "../pipelineScripts/umap/umap.py"
+
+rule runHotspot:
+    input:
+        loom=data("cd4/data.loom"),
+        latent=rules.PCA.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"

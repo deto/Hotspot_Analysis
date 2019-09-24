@@ -43,10 +43,10 @@ pair_fun <- function(file_pair, stat_col, stat_colb=stat_col){
 # %% Run for Hotspot pairs
 
 files <- c(
-    "../Puck_180819_9/hotspot/hotspot.txt",
-    "../Puck_180819_10/hotspot/hotspot.txt",
-    "../Puck_180819_11/hotspot/hotspot.txt",
-    "../Puck_180819_12/hotspot/hotspot.txt"
+    "../Puck_180819_9/hotspot/hotspot_300.txt",
+    "../Puck_180819_10/hotspot/hotspot_300.txt",
+    "../Puck_180819_11/hotspot/hotspot_300.txt",
+    "../Puck_180819_12/hotspot/hotspot_300.txt"
 )
 
 stat_col <- "Z"
@@ -59,10 +59,10 @@ jsonlite::write_json(
 # %% Run for SDE Pairs
 
 files <- c(
-    "../Puck_180819_9/spatialDE/spatialDE.txt",
-    "../Puck_180819_10/spatialDE/spatialDE.txt",
-    "../Puck_180819_11/spatialDE/spatialDE.txt",
-    "../Puck_180819_12/spatialDE/spatialDE.txt"
+    "../Puck_180819_9/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_10/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_11/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_12/spatialDE/spatialDE_fixed.txt"
 )
 
 stat_col <- "LLR"
@@ -76,10 +76,10 @@ jsonlite::write_json(
 
 
 combos <- list(
-    c("../Puck_180819_9/hotspot/hotspot.txt",  "../Puck_180819_9/spatialDE/spatialDE.txt"),
-    c("../Puck_180819_10/hotspot/hotspot.txt", "../Puck_180819_10/spatialDE/spatialDE.txt"),
-    c("../Puck_180819_11/hotspot/hotspot.txt", "../Puck_180819_11/spatialDE/spatialDE.txt"),
-    c("../Puck_180819_12/hotspot/hotspot.txt", "../Puck_180819_12/spatialDE/spatialDE.txt")
+    c("../Puck_180819_9/hotspot/hotspot_300.txt",  "../Puck_180819_9/spatialDE/spatialDE_fixed.txt"),
+    c("../Puck_180819_10/hotspot/hotspot_300.txt", "../Puck_180819_10/spatialDE/spatialDE_fixed.txt"),
+    c("../Puck_180819_11/hotspot/hotspot_300.txt", "../Puck_180819_11/spatialDE/spatialDE_fixed.txt"),
+    c("../Puck_180819_12/hotspot/hotspot_300.txt", "../Puck_180819_12/spatialDE/spatialDE_fixed.txt")
 )
 
 stat_colA <- "Z"
@@ -121,10 +121,10 @@ idr_group <- function(files, stat_col) {
 }
 
 files <- c(
-    "../Puck_180819_9/hotspot/hotspot.txt",
-    "../Puck_180819_10/hotspot/hotspot.txt",
-    "../Puck_180819_11/hotspot/hotspot.txt",
-    "../Puck_180819_12/hotspot/hotspot.txt"
+    "../Puck_180819_9/hotspot/hotspot_300.txt",
+    "../Puck_180819_10/hotspot/hotspot_300.txt",
+    "../Puck_180819_11/hotspot/hotspot_300.txt",
+    "../Puck_180819_12/hotspot/hotspot_300.txt"
 )
 
 stat_col <- "Z"
@@ -133,10 +133,10 @@ res_hs4 <- idr_group(files, stat_col)
 res_hs3 <- idr_group(files[2:4], stat_col)
 
 files <- c(
-    "../Puck_180819_9/spatialDE/spatialDE.txt",
-    "../Puck_180819_10/spatialDE/spatialDE.txt",
-    "../Puck_180819_11/spatialDE/spatialDE.txt",
-    "../Puck_180819_12/spatialDE/spatialDE.txt"
+    "../Puck_180819_9/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_10/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_11/spatialDE/spatialDE_fixed.txt",
+    "../Puck_180819_12/spatialDE/spatialDE_fixed.txt"
 )
 
 stat_col <- "LLR"

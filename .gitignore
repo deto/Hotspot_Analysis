@@ -3,10 +3,11 @@ python_src*
 old/*
 *.csv.gz
 *.txt.gz
+*.txt.gz.*
 *.feather
 *.loom
 *.txt
-*.snakemake
+*.snakemake*
 *.csv
 *.mat
 *.pdf
@@ -21,4 +22,8 @@ old/*
 *.h5
 *.json
 *.ipynb_checkpoints*
+*.xlsx
+*job.sh
 SlideSeq/DropViz/DropSeq.util*
+.notags
+*.html

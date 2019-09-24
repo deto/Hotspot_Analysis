@@ -21,16 +21,16 @@ rule select_all:
     input:
         loom=data("data.loom"),
     output:
-        genes="all/genes.txt"
+        genes="genes/all.txt"
     script: "../pipelineScripts/select_all.py"
 
 rule PCA:
     message: "Computing PCA"
     input:
         loom=data("data.loom"),
-        genes="all/genes.txt"
+        genes=rules.select_all.output.genes,
     output:
-        latent="pca/pca.txt",
+        latent="pca/pca_all.txt",
     script: "../pipelineScripts/pca/pca.py"
 
 rule TSNE:
@@ -64,25 +64,98 @@ rule runHotspot:
         loom=data("data.loom"),
         latent=rules.extractPositions.output.positions,
     params:
-        model='bernoulli'
+        model='bernoulli',
+        n_neighbors=30,
     output:
         results="hotspot/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot_linear:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli_L',
+        n_neighbors=300,
+    output:
+        results="hotspot/hotspot_linear.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot100:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli',
+        n_neighbors=100,
+    output:
+        results="hotspot/hotspot_100.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot300:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli',
+        n_neighbors=300,
+    output:
+        results="hotspot/hotspot_300.txt"
     script: "../pipelineScripts/hotspot/runHotspot.py"
 
 rule runHotspotPairs:
     input:
         loom=data("data.loom"),
         latent=rules.extractPositions.output.positions,
-        hs_results=rules.runHotspot.output.results,
+        hs_results=rules.runHotspot300.output.results,
     params:
         model='bernoulli',
         fdrThresh=0.05,
+        n_neighbors=300,
     output:
         results_lc="hotspot/hotspot_pairs_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "../pipelineScripts/hotspot/runHotspotPairs.py"
 
+# Hotspot pairs, but using the genes from puck 12
+rule runHotspotPairs_Puck12:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        hs_results="../Puck_180819_12/hotspot/hotspot_300.txt"
+    params:
+        model='bernoulli',
+        fdrThresh=0.05,
+        n_neighbors=300,
+    output:
+        results_lc="hotspot/hotspot_pairs_lc_12.txt.gz",
+        results_z="hotspot/hotspot_pairs_z_12.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules:
+    input:
+        results_z=rules.runHotspotPairs.output.results_z,
+    params:
+        min_cluster_genes=50,
+        max_cluster_distance=0.4,
+    output:
+        cluster_diagnostics="hotspot/module_diagnostics.png",
+        cluster_heatmap="hotspot/module_heatmap.svg",
+        cluster_output="hotspot/modules.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
 rule spatialDE:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        l_min=50,
+    threads: 10
+    output:
+        results="spatialDE/spatialDE_fixed.txt"
+    script: "../pipelineScripts/SpatialDE/runSpatialDE.py"
+
+rule spatialDE_original:
     input:
         loom=data("data.loom"),
         latent=rules.extractPositions.output.positions,
@@ -90,6 +163,7 @@ rule spatialDE:
     output:
         results="spatialDE/spatialDE.txt"
     script: "../pipelineScripts/SpatialDE/runSpatialDE.py"
+
 
 rule spatialDEClusters:
     input:

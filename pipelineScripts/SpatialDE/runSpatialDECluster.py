@@ -26,6 +26,8 @@ with loompy.connect(loom_file, 'r') as ds:
 gene_info = pd.DataFrame(
     gene_info, columns=['EnsID', 'Symbol']).set_index('EnsID')
 
+num_umi = pd.Series(num_umi, index=barcodes)
+
 sde_results = pd.read_table(sde_results_file)
 
 print('Filtering Data...')
@@ -36,7 +38,11 @@ gene_info = gene_info.loc[valid_genes]
 
 counts = counts.T
 
-counts = pd.DataFrame(counts, columns=gene_info.index)
+counts = pd.DataFrame(counts, columns=gene_info.index, index=barcodes)
+
+# Subset counts/num_umi for only the barcodes in the window
+counts = counts.loc[latent.index]
+num_umi = num_umi.loc[latent.index]
 
 # prepare 'sample_info' like they want it
 sample_info = latent.copy()
