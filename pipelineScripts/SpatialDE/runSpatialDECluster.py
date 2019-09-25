@@ -1,5 +1,8 @@
+import os
 import pandas as pd
 import loompy
+import time
+import json
 
 import NaiveDE
 import SpatialDE
@@ -16,6 +19,12 @@ sde_results_file = snakemake.input['sde_results']
 
 out_file_hist = snakemake.output['hist']
 out_file_patterns = snakemake.output['patterns']
+out_file_log = os.path.splitext(out_file_hist)[0]+".log"
+
+try:
+    n_components = snakemake.params['n_components']
+except AttributeError:
+    n_components = 5
 
 with loompy.connect(loom_file, 'r') as ds:
     barcodes = ds.ca['Barcode'][:]
@@ -64,13 +73,32 @@ X = sample_info[['Comp1', 'Comp2']].values
 sde_results_sub = sde_results.sort_values('LLR').tail(500)
 
 # Pick l=350 as average is around 300
-# Pick C=5 as there seems to be at least 5 components
+L = 350
+
+start_time = time.time()
 
 print('Running AES...')
 histology_results, patterns = SpatialDE.aeh.spatial_patterns(
-    X, resid_expr, sde_results_sub, C=5, l=350, verbosity=999)
+    X, resid_expr, sde_results_sub, C=n_components, l=L, verbosity=999)
+
+stop_time = time.time()
 
 print('Saving Results...')
 histology_results.to_csv(out_file_hist, sep="\t")
 patterns.to_csv(out_file_patterns, sep="\t")
+
+N_GENES = sde_results_sub.shape[0]
+N_CELLS = X.shape[0]
+
+out = {
+    'Genes': N_GENES,
+    'Cells': N_CELLS,
+    'Components': n_components,
+    'L': L,
+    'Time': stop_time - start_time,
+}
+
+with open(out_file_log, 'w') as fout:
+    json.dump(out, fout, indent=1)
+
 print('Done!')

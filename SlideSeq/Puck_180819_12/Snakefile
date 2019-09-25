@@ -178,14 +178,28 @@ rule windowPositions:
         positions="positions/positions_windowed.txt"
     script: "../../pipelineScripts/windowPositions.py"
 
-rule spatialDEClusters_windowed:
+rule spatialDEClusters_windowed5:
     input:
         loom=data("data.loom"),
         latent=rules.windowPositions.output.positions,
         sde_results=rules.spatialDE.output.results,
+    params:
+        n_components=5,
     output:
-        hist="spatialDE/histology_windowed.txt",
-        patterns="spatialDE/patterns_windowed.txt",
+        hist="spatialDE/histology_windowed_5.txt",
+        patterns="spatialDE/patterns_windowed_5.txt",
+    script: "../../pipelineScripts/SpatialDE/runSpatialDECluster.py"
+
+rule spatialDEClusters_windowed10:
+    input:
+        loom=data("data.loom"),
+        latent=rules.windowPositions.output.positions,
+        sde_results=rules.spatialDE.output.results,
+    params:
+        n_components=10,
+    output:
+        hist="spatialDE/histology_windowed_10.txt",
+        patterns="spatialDE/patterns_windowed_10.txt",
     script: "../../pipelineScripts/SpatialDE/runSpatialDECluster.py"
 
 rule timeHotspot:
