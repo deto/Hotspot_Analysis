@@ -1,0 +1,97 @@
+# rule SCVI:
+#     message: "Running scVI"
+#     input:
+#         exp=rules.extract_data.output.counts,
+#         meta=rules.extract_data.output.meta,
+#     params:
+#         has_batch=False,
+#         filterType='Fano',
+#         filterParam1=10,
+#         filterParam2=1.5,
+#         components=10,
+#         zinb=False,
+#     output:
+#         model="scvi/model.pkl",
+#         model_genes="scvi/model_genes.txt",
+#         latent="scvi/latent.txt.gz",
+#         batch_encoding="scvi/batch_encoding.txt",
+#     script: "../pipelineScripts/scvi/scviTorch.py"
+#
+subworkflow data:
+    workdir:
+        "../data/10x_PBMC_w_proteins"
+
+include: "Snakefile_all"
+include: "Snakefile_threshold"
+include: "Snakefile_hvg"
+include: "Snakefile_hs"
+include: "Snakefile_shuffled"
+
+rule runHotspotPairs:
+    input:
+        loom=data("cd4/data.loom"),
+        latent=rules.SCVI_hvg.output.latent,
+        hs_results=rules.runHotspot.output.results,
+    params:
+        model='danb',
+        fdrThresh=0.05,
+        topN=500,
+        n_neighbors=30,
+    output:
+        results_lc="hotspot/hotspot_pairs_lc.txt.gz",
+        results_z="hotspot/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule runRegularPairs:
+    input:
+        loom=data("cd4/data.loom"),
+        hs_results=rules.runHotspotPairs.input.hs_results,
+    params:
+        model='danb',
+        fdrThresh=rules.runHotspotPairs.params.fdrThresh,
+        topN=rules.runHotspotPairs.params.topN,
+    output:
+        results_lc="hotspot/regular_pairs_lc.txt.gz",
+    script: "../pipelineScripts/hotspot/runRegularPairs.py"
+
+rule extractHotspotModules:
+    input:
+        results_z=rules.runHotspotPairs.output.results_z,
+    params:
+        min_cluster_genes=10,
+        min_cluster_z=20,
+    output:
+        cluster_diagnostics="hotspot/module_diagnostics.png",
+        cluster_heatmap="hotspot/module_heatmap.svg",
+        cluster_output="hotspot/modules.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule vision:
+    input:
+        loom=data("cd4/data.loom"),
+        latent=rules.SCVI_threshold.output.latent,
+        proj_positions=rules.SCVI_threshold.output.latent,
+        tsne=rules.TSNE_threshold.output.out,
+        umap=rules.UMAP_threshold.output.out,
+        proteins=data("cd4/ab.txt.gz"),
+    output:
+        out="vision/vision.rds"
+    script: "../pipelineScripts/Vision/vision.R"
+
+rule computeGRScores:
+    input:
+        signatures="/data/yosef2/users/david.detomaso/Signatures/MSIGDB/c7_subsets/TCells_noCD8.gmt",
+    output:
+        out="evaluation/geneRelevanceScores.txt"
+    script: "scripts/computeGeneRelevanceScores.py"
+
+rule all:
+    input:
+        rules.UMAP.output.out,
+        rules.TSNE.output.out,
+        rules.vision.output.out,
+        rules.runHotspotPairs.output,
+        rules.runHotspot_hvg.output.results,
+        rules.runHotspot_threshold.output.results,
+        rules.runHotspot_shuffled.output.results,
+
