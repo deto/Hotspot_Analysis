@@ -1,6 +1,6 @@
 rule select_hvg:
     input:
-        loom=data("cd4/data.loom"),
+        loom=data("cd4_l2/data.loom"),
     params:
         lowXcutoff=0.1,
     output:
@@ -10,7 +10,7 @@ rule select_hvg:
 rule PCA_hvg:
     message: "Computing PCA on highly-variable genes"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data("cd4_l2/data.loom"),
         genes=rules.select_hvg.output.genes,
     output:
         latent="pca/pca_hvg.txt",
@@ -19,7 +19,7 @@ rule PCA_hvg:
 rule SCVI_hvg:
     message: "Computing SCVI on hvg genes"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data("cd4_l2/data.loom"),
         genes=rules.select_hvg.output.genes,
     params:
         components=10,
@@ -64,7 +64,7 @@ rule cluster_hvg:
 rule cluster_markers_hvg:
     message: "Finding cluster markers on PCA-hvg"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data("cd4_l2/data.loom"),
         clusters=rules.cluster_hvg.output.clusters,
     output:
         out="clusters/markers_hvg.txt.gz",
@@ -73,7 +73,7 @@ rule cluster_markers_hvg:
 
 rule runHotspot_hvg:
     input:
-        loom=data("cd4/data.loom"),
+        loom=data("cd4_l2/data.loom"),
         latent=rules.SCVI_hvg.output.latent,
     params:
         model='danb',
@@ -83,26 +83,14 @@ rule runHotspot_hvg:
         results="hotspot/hotspot_hvg.txt"
     script: "../pipelineScripts/hotspot/runHotspot.py"
 
-rule runHotspot_hvg_proteins:
-    input:
-        proteins=data("cd4/ab.txt.gz"),
-        latent=rules.SCVI_hvg.output.latent,
-    params:
-        model='danb',
-        n_neighbors=30,
-        n_cells_min=10,
-    output:
-        results="hotspot/hotspot_hvg_proteins.txt"
-    script: "../pipelineScripts/hotspot/runHotspotProteins.py"
-
 rule vision_hvg:
     input:
-        loom=data("cd4/data.loom"),
+        loom=data("cd4_l2/data.loom"),
         latent=rules.SCVI_hvg.output.latent,
         proj_positions=rules.SCVI_hvg.output.latent,
         tsne=rules.TSNE_hvg.output.out,
         umap=rules.UMAP_hvg.output.out,
-        proteins=data("cd4/ab.txt.gz"),
+        meta_clusters=rules.cluster_hvg.output.clusters,
     output:
         out="vision/vision_hvg.rds"
     script: "../pipelineScripts/Vision/vision.R"

@@ -5,30 +5,31 @@ rule select_hs:
         hs_results=rules.runHotspot_hvg.output.results,
     params:
         fdrThresh=0.05,
+        cThresh=0.05,
     output:
         genes="genes/hs.txt"
-    script: "../pipelineScripts/select_hs.py"
+    script: "pipelineScripts/select_hs.py"
 
 rule PCA_hs:
     message: "Computing PCA on highly-variable genes"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         genes=rules.select_hs.output.genes,
     output:
         latent="pca/pca_hs.txt",
-    script: "../pipelineScripts/pca/pca.py"
+    script: "pipelineScripts/pca/pca.py"
 
 rule SCVI_hs:
     message: "Computing SCVI on hs genes"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         genes=rules.select_hs.output.genes,
     params:
         components=10,
     output:
         latent="scvi/hs/latent.txt.gz",
         model="scvi/hs/model.pkl",
-    script: "../pipelineScripts/scvi/scviTorch.py"
+    script: "pipelineScripts/scvi/scviTorch.py"
 
 rule TSNE_hs:
     message: "Computing TSNE - hs genes"
@@ -36,7 +37,7 @@ rule TSNE_hs:
         latent=rules.SCVI_hs.output.latent,
     output:
         out="tsne/tsne_hs.txt",
-    script: "../pipelineScripts/tsne/tsne.py"
+    script: "pipelineScripts/tsne/tsne.py"
 
 rule UMAP_hs:
     message: "Computing UMAP"
@@ -46,11 +47,11 @@ rule UMAP_hs:
         n_neighbors=30,
     output:
         out="umap/umap_hs.txt",
-    script: "../pipelineScripts/umap/umap.py"
+    script: "pipelineScripts/umap/umap.py"
 
 rule runHotspot_hs_proteins:
     input:
-        proteins=data("cd4/ab.txt.gz"),
+        proteins=data(ab_file),
         latent=rules.SCVI_hs.output.latent,
     params:
         model='danb',
@@ -58,16 +59,16 @@ rule runHotspot_hs_proteins:
         n_cells_min=10,
     output:
         results="hotspot/hotspot_hs_proteins.txt"
-    script: "../pipelineScripts/hotspot/runHotspotProteins.py"
+    script: "pipelineScripts/hotspot/runHotspotProteins.py"
 
 rule vision_hs:
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         latent=rules.SCVI_hs.output.latent,
         proj_positions=rules.SCVI_hs.output.latent,
         tsne=rules.TSNE_hs.output.out,
         umap=rules.UMAP_hs.output.out,
-        proteins=data("cd4/ab.txt.gz"),
+        proteins=data(ab_file),
     output:
         out="vision/vision_hs.rds"
-    script: "../pipelineScripts/Vision/vision.R"
+    script: "pipelineScripts/Vision/vision.R"

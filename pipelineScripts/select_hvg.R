@@ -41,4 +41,16 @@ obj <- FindVariableGenes(object = obj, mean.function = ExpMean,
 
 genes <- obj@var.genes
 
+if ("highXMeanCutoff" %in% names(snakemake@params)) {
+    high_cut <- snakemake@params[["highXMeanCutoff"]]
+    geneMeans <- rowMeans(exp(obj@data) - 1)
+    valid_genes <- names(geneMeans)[geneMeans < high_cut]
+    genes <- intersect(genes, valid_genes)
+}
+
+if ("geneInfo" %in% names(snakemake@output)) {
+    geneInfoFile <- snakemake@output[["geneInfo"]]
+    write.table(obj@hvg.info, geneInfoFile, sep = "\t")
+}
+
 writeLines(genes, file(genes_out_file))

@@ -1,32 +1,32 @@
 rule select_threshold:
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
     params:
         N_CELLS=10,
     output:
         genes="genes/threshold.txt"
-    script: "../pipelineScripts/select_threshold.py"
+    script: "pipelineScripts/select_threshold.py"
 
 rule PCA_threshold:
     message: "Computing PCA on thresholded genes"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         genes=rules.select_threshold.output.genes,
     output:
         latent="pca/pca_threshold.txt",
-    script: "../pipelineScripts/pca/pca.py"
+    script: "pipelineScripts/pca/pca.py"
 
 rule SCVI_threshold:
     message: "Computing SCVI on thresholded genes"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         genes=rules.select_threshold.output.genes,
     params:
         components=10,
     output:
         latent="scvi/threshold/latent.txt.gz",
         model="scvi/threshold/model.pkl",
-    script: "../pipelineScripts/scvi/scviTorch.py"
+    script: "pipelineScripts/scvi/scviTorch.py"
 
 rule TSNE_threshold:
     message: "Computing TSNE - hvg genes"
@@ -34,7 +34,7 @@ rule TSNE_threshold:
         latent=rules.SCVI_threshold.output.latent,
     output:
         out="tsne/tsne_threshold.txt",
-    script: "../pipelineScripts/tsne/tsne.py"
+    script: "pipelineScripts/tsne/tsne.py"
 
 rule UMAP_threshold:
     message: "Computing UMAP"
@@ -44,7 +44,7 @@ rule UMAP_threshold:
         n_neighbors=30,
     output:
         out="umap/umap_threshold.txt",
-    script: "../pipelineScripts/umap/umap.py"
+    script: "pipelineScripts/umap/umap.py"
 
 rule cluster_threshold:
     message: "Creating clusters on PCA-threshold"
@@ -58,21 +58,21 @@ rule cluster_threshold:
         cluster_colors="clusters/cluster_colors_threshold.json",
         cluster_plot="clusters/cluster_threshold.png",
         clusters="clusters/clusters_threshold.txt",
-    script: "../pipelineScripts/cluster/makeClusters.py"
+    script: "pipelineScripts/cluster/makeClusters.py"
 
 rule cluster_markers_threshold:
     message: "Finding cluster markers on PCA-threshold"
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         clusters=rules.cluster_threshold.output.clusters,
     output:
         out="clusters/markers_threshold.txt.gz",
         out_xlsx="clusters/markers_threshold.xlsx",
-    script: "../pipelineScripts/cluster/cluster_de_1vAll_edgeR.R"
+    script: "pipelineScripts/cluster/cluster_de_1vAll_edgeR.R"
 
 rule runHotspot_threshold:
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         latent=rules.SCVI_threshold.output.latent,
     params:
         model='danb',
@@ -80,11 +80,23 @@ rule runHotspot_threshold:
         n_cells_min=10,
     output:
         results="hotspot/hotspot_threshold.txt"
-    script: "../pipelineScripts/hotspot/runHotspot.py"
+    script: "pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot_threshold_pca:
+    input:
+        loom=data(data_file),
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_pca_threshold.txt"
+    script: "pipelineScripts/hotspot/runHotspot.py"
 
 rule runHotspot_threshold_proteins:
     input:
-        proteins=data("cd4/ab.txt.gz"),
+        proteins=data(ab_file),
         latent=rules.SCVI_threshold.output.latent,
     params:
         model='danb',
@@ -92,6 +104,6 @@ rule runHotspot_threshold_proteins:
         n_cells_min=10,
     output:
         results="hotspot/hotspot_threshold_proteins.txt"
-    script: "../pipelineScripts/hotspot/runHotspotProteins.py"
+    script: "pipelineScripts/hotspot/runHotspotProteins.py"
 
 

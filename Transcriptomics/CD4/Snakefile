@@ -19,18 +19,15 @@
 #
 subworkflow data:
     workdir:
-        "../data/10x_PBMC_w_proteins"
+        "../data/10x_PBMC/"
 
-include: "Snakefile_all"
-include: "Snakefile_threshold"
 include: "Snakefile_hvg"
-include: "Snakefile_shuffled"
 
 rule runHotspotPairs:
     input:
-        loom=data("cd4/data.loom"),
-        latent=rules.PCA.output.latent,
-        hs_results=rules.runHotspot.output.results,
+        loom=data("cd4_l2/data.loom"),
+        latent=rules.SCVI_hvg.output.latent,
+        hs_results=rules.runHotspot_hvg.output.results,
     params:
         model='danb',
         fdrThresh=0.05,
@@ -41,28 +38,29 @@ rule runHotspotPairs:
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "../pipelineScripts/hotspot/runHotspotPairs.py"
 
+rule runRegularPairs:
+    input:
+        loom=data("cd4_l2/data.loom"),
+        hs_results=rules.runHotspotPairs.input.hs_results,
+    params:
+        model='danb',
+        fdrThresh=rules.runHotspotPairs.params.fdrThresh,
+        topN=rules.runHotspotPairs.params.topN,
+    output:
+        results_lc="hotspot/regular_pairs_lc.txt.gz",
+    script: "../pipelineScripts/hotspot/runRegularPairs.py"
+
 rule extractHotspotModules:
     input:
         results_z=rules.runHotspotPairs.output.results_z,
     params:
-        min_cluster_genes=50,
-        max_cluster_distance=0.4,
+        min_cluster_genes=10,
+        min_cluster_z=20,
     output:
         cluster_diagnostics="hotspot/module_diagnostics.png",
         cluster_heatmap="hotspot/module_heatmap.svg",
         cluster_output="hotspot/modules.txt",
     script: "../pipelineScripts/hotspot/extractHotspotModules.py"
-
-rule vision:
-    input:
-        loom=data("cd4/data.loom"),
-        latent=rules.PCA.output.latent,
-        proj_positions=rules.PCA.output.latent,
-        tsne=rules.TSNE.output.out,
-        umap=rules.UMAP.output.out,
-    output:
-        out="vision/vision.rds"
-    script: "../pipelineScripts/Vision/vision.R"
 
 rule computeGRScores:
     input:
@@ -73,11 +71,8 @@ rule computeGRScores:
 
 rule all:
     input:
-        rules.UMAP.output.out,
-        rules.TSNE.output.out,
-        rules.vision.output.out,
+        rules.vision_hvg.output.out,
         rules.runHotspotPairs.output,
+        rules.extractHotspotModules.output,
         rules.runHotspot_hvg.output.results,
-        rules.runHotspot_threshold.output.results,
-        rules.runHotspot_shuffled.output.results,
 

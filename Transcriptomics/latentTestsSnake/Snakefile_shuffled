@@ -3,11 +3,11 @@ rule shuffleLatent:
         positions=rules.PCA.output.latent,
     output:
         positions="positions/positions_shuffled.txt"
-    script: "../pipelineScripts/shufflePositions.py"
+    script: "pipelineScripts/shufflePositions.py"
 
 rule runHotspot_shuffled:
     input:
-        loom=data("cd4/data.loom"),
+        loom=data(data_file),
         latent=rules.shuffleLatent.output.positions,
     params:
         model='danb',
@@ -15,5 +15,5 @@ rule runHotspot_shuffled:
         n_cells_min=10,
     output:
         results="hotspot/hotspot_shuffled.txt"
-    script: "../pipelineScripts/hotspot/runHotspot.py"
+    script: "pipelineScripts/hotspot/runHotspot.py"
 

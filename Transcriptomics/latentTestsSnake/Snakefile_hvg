@@ -1,0 +1,122 @@
+rule select_hvg:
+    input:
+        loom=data(data_file),
+    params:
+        lowXcutoff=0.1,
+        highXMeanCutoff=20,
+    output:
+        genes="genes/hvg.txt",
+        geneInfo="genes/hvg_info.txt"
+    script: "pipelineScripts/select_hvg.R"
+
+rule PCA_hvg:
+    message: "Computing PCA on highly-variable genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_hvg.output.genes,
+    output:
+        latent="pca/pca_hvg.txt",
+    script: "pipelineScripts/pca/pca.py"
+
+rule SCVI_hvg:
+    message: "Computing SCVI on hvg genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_hvg.output.genes,
+    params:
+        components=10,
+    output:
+        latent="scvi/hvg/latent.txt.gz",
+        model="scvi/hvg/model.pkl",
+    script: "pipelineScripts/scvi/scviTorch.py"
+
+rule TSNE_hvg:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.SCVI_hvg.output.latent,
+    output:
+        out="tsne/tsne_hvg.txt",
+    script: "pipelineScripts/tsne/tsne.py"
+
+rule UMAP_hvg:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI_hvg.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap_hvg.txt",
+    script: "pipelineScripts/umap/umap.py"
+
+
+rule cluster_hvg:
+    message: "Creating clusters on PCA-hvg"
+    input:
+        latent=rules.PCA_hvg.output.latent,
+        tsne=rules.TSNE_hvg.output.out,
+    params:
+        n_neighbors=30,
+        resolution=1,
+    output:
+        cluster_colors="clusters/cluster_colors_hvg.json",
+        cluster_plot="clusters/cluster_hvg.png",
+        clusters="clusters/clusters_hvg.txt",
+    script: "pipelineScripts/cluster/makeClusters.py"
+
+rule cluster_markers_hvg:
+    message: "Finding cluster markers on PCA-hvg"
+    input:
+        loom=data(data_file),
+        clusters=rules.cluster_hvg.output.clusters,
+    output:
+        out="clusters/markers_hvg.txt.gz",
+        out_xlsx="clusters/markers_hvg.xlsx",
+    script: "pipelineScripts/cluster/cluster_de_1vAll_edgeR.R"
+
+rule runHotspot_hvg:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_hvg.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_hvg.txt"
+    script: "pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot_hvg_proteins:
+    input:
+        proteins=data(ab_file),
+        latent=rules.SCVI_hvg.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_hvg_proteins.txt"
+    script: "pipelineScripts/hotspot/runHotspotProteins.py"
+
+rule vision_hvg:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_hvg.output.latent,
+        proj_positions=rules.SCVI_hvg.output.latent,
+        tsne=rules.TSNE_hvg.output.out,
+        umap=rules.UMAP_hvg.output.out,
+        proteins=data(ab_file),
+    output:
+        out="vision/vision_hvg.rds"
+    script: "pipelineScripts/Vision/vision.R"
+
+rule all_hvg:
+    input:
+        rules.PCA_hvg.output,
+        rules.SCVI_hvg.output,
+        rules.TSNE_hvg.output,
+        rules.UMAP_hvg.output,
+        rules.cluster_hvg.output,
+        rules.runHotspot_hvg.output,
+        rules.runHotspot_hvg_proteins.output,
+        rules.vision_hvg.output,
+

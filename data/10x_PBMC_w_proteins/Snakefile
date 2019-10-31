@@ -26,7 +26,28 @@ rule parse_data_cd4:
         ab="cd4/ab.txt.gz",
     script: "parse_cd4.py"
 
+rule parse_data_healthy:
+    input:
+        loom=rules.parse_data.output.loom,
+        ab=rules.parse_data.output.ab,
+    output:
+        loom=protected("healthy/data.loom"),
+        ab="healthy/ab.txt.gz",
+    script: "parse_healthy.py"
+
+rule parse_data_monocytes:
+    input:
+        loom=rules.parse_data_healthy.output.loom,
+        ab=rules.parse_data_healthy.output.ab,
+    output:
+        loom=protected("mono/data.loom"),
+        ab="mono/ab.txt.gz",
+    script: "parse_monocytes.py"
+
+
 rule all:
     input:
         expand(rules.parse_data.output),
         expand(rules.parse_data_cd4.output),
+        expand(rules.parse_data_healthy.output),
+        expand(rules.parse_data_monocytes.output),

@@ -1,0 +1,19 @@
+rule select_danb:
+    input:
+        loom=data(data_file),
+    params:
+        highXMeanCutoff=20,
+    output:
+        genes="genes/danb.txt",
+        geneInfo="genes/danb_info.txt"
+    script: "pipelineScripts/select_danb.R"
+
+rule select_pca:
+    input:
+        loom=data(data_file),
+    params:
+        highXMeanCutoff=20,
+    output:
+        genes="genes/pca.txt",
+        geneInfo="genes/pca_info.txt"
+    script: "pipelineScripts/select_pca.R"

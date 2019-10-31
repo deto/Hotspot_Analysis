@@ -1,8 +1,9 @@
 import loompy
+import numpy as np
 import pandas as pd
 import hotspot
 
-loom_file = snakemake.input['loom']
+proteins_file = snakemake.input['proteins']
 latent_file = snakemake.input['latent']
 out_file = snakemake.output['results']
 
@@ -19,37 +20,24 @@ try:
 except AttributeError:
     n_cells_min = 50
 
-with loompy.connect(loom_file, 'r') as ds:
-    barcodes = ds.ca['Barcode'][:]
-    counts = ds[:, :]
-    gene_info = ds.ra['EnsID', 'Symbol']
-    num_umi = ds.ca['NumUmi'][:]
-
 latent = pd.read_table(latent_file, index_col=0)
 
 # Have to do this because data_slideseq makes it a numpy array
-gene_info = pd.DataFrame(
-    gene_info, columns=['EnsID', 'Symbol']).set_index('EnsID')
-counts = pd.DataFrame(counts, index=gene_info.index, columns=barcodes)
-num_umi = pd.Series(num_umi, index=barcodes)
+counts = pd.read_table(proteins_file, index_col=0).T
+counts = np.log2(counts + 1)
+num_umi = pd.Series(1.0, index=counts.columns)
 
 # Align to latent space
 counts = counts.loc[:, latent.index]
 num_umi = num_umi[latent.index]
 
 # need counts, latent, and num_umi
-
-valid_genes = (counts > 0).sum(axis=1) >= n_cells_min
-counts = counts.loc[valid_genes]
-
 hs = hotspot.Hotspot(counts, latent, num_umi)
 
 hs.create_knn_graph(
-    weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
+    weighted_graph=True, n_neighbors=n_neighbors, neighborhood_factor=3
 )
 
 results = hs.compute_hotspot(model=model, jobs=5, centered=True)
-
-results = gene_info.join(results, how='right')
 
 results.to_csv(out_file, sep="\t")

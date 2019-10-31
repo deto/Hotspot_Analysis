@@ -1,4 +1,4 @@
-devtools::load_all("/data/yosef2/users/david.detomaso/repos/VISION")
+devtools::load_all("/data/yosef2/users/david.detomaso/repos/VISION-ADT")
 library(loomR)
 
 loom_file <- snakemake@input[["loom"]]
@@ -50,6 +50,16 @@ if ("unnorm" %in% names(snakemake@input)){
     unnorm <- NULL
 }
 
+if ("proteins" %in% names(snakemake@input)) {
+    protein_file <- snakemake@input[["proteins"]]
+    proteinData <- read.table(gzfile(protein_file), header = TRUE,
+        row.names = 1)
+    proteinData <- proteinData[colnames(expression), , drop = FALSE]
+    proteinData <- log2(proteinData + 1)
+} else {
+    proteinData <- NULL
+}
+
 # Load any file that starts with 'meta_' as more metadata
 for (input_name in names(snakemake@input)) {
     if (startsWith(input_name, "meta_")) {
@@ -81,6 +91,7 @@ if ("tsne" %in% names(snakemake@input) || "umap" %in% names(snakemake@input) ||
 
 fp <- Vision(expression, signatures = sigs, meta = meta,
              projection_genes = rownames(expression),
+             proteinData = proteinData,
              name = name,
              unnormalizedData = unnorm,
              projection_methods = projection_methods,

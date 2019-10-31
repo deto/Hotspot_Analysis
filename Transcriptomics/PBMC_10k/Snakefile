@@ -1,0 +1,8 @@
+subworkflow data:
+    workdir:
+        "../data/10x_PBMC_10k_w_proteins/"
+
+data_file = "data.loom"
+ab_file = "ab.txt.gz"
+
+include: "../latentTestsSnake/Snakefile"

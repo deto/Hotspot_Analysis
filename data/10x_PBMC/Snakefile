@@ -1,4 +1,3 @@
-
 rule download_data:
     output:
        h5="raw/pbmc_10k_v3_filtered_feature_bc_matrix.h5"
@@ -16,6 +15,71 @@ rule parse_data:
         loom=protected("data.loom")
     script: "parse.py"
 
+rule select_threshold:
+    input:
+        loom=rules.parse_data.output.loom,
+    params:
+        N_CELLS=10,
+    output:
+        genes="genes/threshold.txt"
+    script: "../../pipelineScripts/select_threshold.py"
+
+rule PCA_threshold:
+    message: "Computing PCA on thresholded genes"
+    input:
+        loom=rules.parse_data.output.loom,
+        genes=rules.select_threshold.output.genes,
+    output:
+        latent="pca/pca_threshold.txt",
+    script: "../../pipelineScripts/pca/pca.py"
+
+rule TSNE_threshold:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    output:
+        out="tsne/tsne_threshold.txt",
+    script: "../../pipelineScripts/tsne/tsne.py"
+
+rule UMAP_threshold:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap_threshold.txt",
+    script: "../../pipelineScripts/umap/umap.py"
+
+rule cluster_threshold:
+    message: "Creating clusters on PCA-threshold"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+        tsne=rules.TSNE_threshold.output.out,
+    params:
+        n_neighbors=30,
+        resolution=1,
+    output:
+        cluster_colors="clusters/cluster_colors_threshold.json",
+        cluster_plot="clusters/cluster_threshold.png",
+        clusters=protected("clusters/clusters_threshold.txt"),
+    script: "../../pipelineScripts/cluster/makeClusters.py"
+
+rule vision:
+    input:
+        loom=rules.parse_data.output.loom,
+        latent=rules.PCA_threshold.output.latent,
+        tsne=rules.TSNE_threshold.output.out,
+        umap=rules.UMAP_threshold.output.out,
+        meta_clusters=rules.cluster_threshold.output.clusters,
+    output:
+        out="vision/vision.rds"
+    script: "../../pipelineScripts/Vision/vision.R"
+
+include: "Snakefile_cd4_l1"
+include: "Snakefile_cd4_l2"
+
 rule all:
     input:
         expand(rules.parse_data.output),
+        expand(rules.vision.output),

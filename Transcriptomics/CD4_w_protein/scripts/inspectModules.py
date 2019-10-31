@@ -13,16 +13,18 @@ from tqdm import tqdm
 
 plt.rcParams["svg.fonttype"] = "none"
 
-results_file = snakemake.input["results_z"]
+# %%
 
-MIN_CLUSTER_GENES = snakemake.params["min_cluster_genes"]  # 50
-MIN_CLUSTER_Z = snakemake.params["min_cluster_z"]  # 7
+results_file = "hotspot/hotspot_pairs_z.txt.gz"
+results_hs_file = "hotspot/hotspot_hvg.txt"
 
-cluster_diagnostics_file = snakemake.output["cluster_diagnostics"]
-cluster_heatmap_file = snakemake.output["cluster_heatmap"]
-cluster_output_file = snakemake.output["cluster_output"]
+MIN_CLUSTER_GENES = 50
+MIN_CLUSTER_Z = 7
 
 results = pd.read_table(results_file, index_col=0)
+results_hs = pd.read_table(results_hs_file, index_col=0)
+
+ens_map = {x: y for x, y in zip(results_hs.index, results_hs.Symbol)}
 
 # %% Compute Linkage and Ordering
 
@@ -109,9 +111,10 @@ plt.figure()
 plt.imshow(cvals, aspect="auto")
 label_ii = np.arange(0, cvals.shape[1], 5)
 plt.xticks(ticks=label_ii, labels=row_colors_all.columns[label_ii], rotation=90)
+label_jj = np.arange(0, cvals.shape[0])
+plt.yticks(ticks=label_jj, labels=[ens_map[x] for x in row_colors_all.index])
 plt.subplots_adjust(bottom=.15)
-# plt.show()
-plt.savefig(cluster_diagnostics_file)
+plt.show()
 
 # %% Compute gene clusters
 
@@ -131,8 +134,6 @@ valid_clusters = [x for x in valid_cluster_map.values() if x != -1]
 
 cluster_map = {k: set(v.index) for k, v in clusters.groupby(clusters)}
 
-clusters.rename('Cluster').to_frame().to_csv(cluster_output_file, sep="\t")
-
 # %% Plot the clusters
 
 colors = list(plt.get_cmap("tab10").colors)
@@ -148,8 +149,8 @@ cm = sns.clustermap(
     results.iloc[ii, ii],
     row_cluster=False,
     col_cluster=False,
-    vmin=-15,
-    vmax=15,
+    vmin=-25,
+    vmax=25,
     cmap="RdBu_r",
     xticklabels=False,
     yticklabels=False,
@@ -162,5 +163,84 @@ fig.patch.set_visible(False)
 plt.sca(cm.ax_heatmap)
 plt.ylabel("")
 plt.xlabel("")
-plt.savefig(cluster_heatmap_file, dpi=300)
-# plt.show()
+plt.show()
+
+# %% what about this other algorithm dynamicTreeCut
+
+import dynamicTreeCut
+
+
+dt_clusters = dynamicTreeCut.cutreeHybrid(
+    link=Z, distM=condensed, minClusterSize=10
+)
+
+# %% Plot and compare results
+
+colors = list(plt.get_cmap("tab10").colors)
+cm = ScalarMappable(norm=Normalize(0, 0.05, clip=True), cmap="viridis")
+row_colors1 = pd.Series(
+    [colors[i % 10] if i != -1 else "#ffffff" for i in clusters],
+    index=results.index,
+)
+row_colors2 = pd.Series(
+    [colors[i % 10] if i != -1 else "#ffffff" for i in dt_clusters['labels']],
+    index=results.index,
+)
+
+row_colors = pd.DataFrame({
+    "Cluster": row_colors1,
+    "Cluster-Dt": row_colors2,
+})
+
+cm = sns.clustermap(
+    results,
+    row_linkage=Z,
+    col_linkage=Z,
+    vmin=-25,
+    vmax=25,
+    cmap="RdBu_r",
+    xticklabels=False,
+    yticklabels=False,
+    row_colors=row_colors,
+    rasterized=True,
+)
+
+fig = plt.gcf()
+fig.patch.set_visible(False)
+plt.sca(cm.ax_heatmap)
+plt.ylabel("")
+plt.xlabel("")
+plt.show()
+
+# %% what if we sort by cluster labels?
+
+new_ii = np.argsort(dt_clusters['labels'])
+
+cm = sns.clustermap(
+    results.iloc[new_ii, new_ii],
+    metric='correlation',
+    row_cluster=True,
+    col_cluster=True,
+    vmin=-55,
+    vmax=55,
+    cmap="RdBu_r",
+    xticklabels=False,
+    yticklabels=results_hs.Symbol.loc[results.index[new_ii]],
+    row_colors=row_colors.iloc[new_ii],
+    rasterized=True,
+)
+
+fig = plt.gcf()
+fig.patch.set_visible(False)
+plt.sca(cm.ax_heatmap)
+plt.ylabel("")
+plt.xlabel("")
+plt.show()
+
+# %% What are these clusters?
+
+rc = results_hs.join(
+    pd.Series(dt_clusters['labels'], index=results.index, name='Cluster')
+)
+
+rc.loc[rc.Cluster == 5].sort_values('Z').tail(20)

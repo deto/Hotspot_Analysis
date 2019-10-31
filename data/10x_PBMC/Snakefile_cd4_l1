@@ -1,0 +1,72 @@
+
+rule parse_data_cd4_l1:
+    input:
+        loom=rules.parse_data.output.loom,
+        clusters=rules.cluster_threshold.output.clusters,
+    params:
+        selected_clusters=["c0", "c1"],
+    output:
+        loom=protected("cd4_l1/data.loom"),
+    script: "parse_cd4_l1.py"
+
+rule select_hvg_l1:
+    input:
+        loom=rules.parse_data_cd4_l1.output.loom,
+    params:
+        lowXcutoff=0.1,
+    output:
+        genes="cd4_l1/genes/selected.txt"
+    script: "../../pipelineScripts/select_hvg.R"
+
+
+rule PCA_l1:
+    message: "Computing PCA on thresholded genes"
+    input:
+        loom=rules.parse_data_cd4_l1.output.loom,
+        genes=rules.select_hvg_l1.output.genes,
+    output:
+        latent="cd4_l1/pca/pca_threshold.txt",
+    script: "../../pipelineScripts/pca/pca.py"
+
+rule TSNE_l1:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_l1.output.latent,
+    output:
+        out="cd4_l1/tsne/tsne_threshold.txt",
+    script: "../../pipelineScripts/tsne/tsne.py"
+
+rule UMAP_l1:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA_l1.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="cd4_l1/umap/umap_threshold.txt",
+    script: "../../pipelineScripts/umap/umap.py"
+
+rule cluster_l1:
+    message: "Creating clusters on PCA-threshold"
+    input:
+        latent=rules.PCA_l1.output.latent,
+        tsne=rules.TSNE_l1.output.out,
+    params:
+        n_neighbors=30,
+        resolution=2,
+    output:
+        cluster_colors="cd4_l1/clusters/cluster_colors.json",
+        cluster_plot="cd4_l1/clusters/clusters.png",
+        clusters=protected("cd4_l1/clusters/clusters.txt"),
+    script: "../../pipelineScripts/cluster/makeClusters.py"
+
+rule vision_l1:
+    input:
+        loom=rules.parse_data_cd4_l1.output.loom,
+        latent=rules.PCA_l1.output.latent,
+        tsne=rules.TSNE_l1.output.out,
+        umap=rules.UMAP_l1.output.out,
+        meta_clusters=rules.cluster_l1.output.clusters,
+    output:
+        out="cd4_l1/vision/vision.rds"
+    script: "../../pipelineScripts/Vision/vision.R"

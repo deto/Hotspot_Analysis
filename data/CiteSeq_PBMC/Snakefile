@@ -17,12 +17,18 @@ rule parse_data:
         adt="GSE100866_PBMC_vs_flow_10X-ADT_umi.csv.gz",
         adt_clr="GSE100866_PBMC_vs_flow_10X-ADT_clr-transformed.csv.gz",
     output:
-        scaled="expression_scaled.feather",
-        counts="expression_counts.feather",
-        meta="meta.txt.gz",
-        adt="adt.txt.gz",
-        adt_clr="adt_clr.txt.gz",
+        loom=protected("data.loom"),
+        ab="ab.txt.gz",
     script: "parse.py"
+
+rule parse_data_cd4:
+    input:
+        loom=rules.parse_data.output.loom,
+        ab=rules.parse_data.output.ab,
+    output:
+        loom=protected("cd4/data.loom"),
+        ab="cd4/ab.txt.gz",
+    script: "parse_cd4.py"
 
 rule all:
     input:

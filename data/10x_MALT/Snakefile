@@ -1,0 +1,22 @@
+
+rule download_data:
+    output:
+        h5="raw/malt_10k_protein_v3_filtered_feature_bc_matrix.h5"
+    shell:
+        """
+        mkdir -p raw
+        cd raw
+        wget http://cf.10xgenomics.com/samples/cell-exp/3.0.0/malt_10k_protein_v3/malt_10k_protein_v3_filtered_feature_bc_matrix.h5
+        """
+
+rule parse_data:
+    input:
+        h5=rules.download_data.output.h5
+    output:
+        loom=protected("data.loom"),
+        ab="ab.txt.gz",
+    script: "parse.py"
+
+rule all:
+    input:
+        expand(rules.parse_data.output),
