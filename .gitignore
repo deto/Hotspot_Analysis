@@ -27,3 +27,4 @@ old/*
 SlideSeq/DropViz/DropSeq.util*
 .notags
 *.html
+*.pkl

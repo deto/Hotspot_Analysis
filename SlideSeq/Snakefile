@@ -1,21 +1,6 @@
-# rule SCVI:
-#     message: "Running scVI"
-#     input:
-#         exp=rules.extract_data.output.counts,
-#         meta=rules.extract_data.output.meta,
-#     params:
-#         has_batch=False,
-#         filterType='Fano',
-#         filterParam1=10,
-#         filterParam2=1.5,
-#         components=10,
-#         zinb=False,
-#     output:
-#         model="scvi/model.pkl",
-#         model_genes="scvi/model_genes.txt",
-#         latent="scvi/latent.txt.gz",
-#         batch_encoding="scvi/batch_encoding.txt",
-#     script: "../pipelineScripts/scvi/scviTorch.py"
+subworkflow puck12:
+    workdir:
+        "../Puck_180819_12"
 
 rule select_all:
     input:
@@ -65,49 +50,16 @@ rule runHotspot:
         latent=rules.extractPositions.output.positions,
     params:
         model='bernoulli',
-        n_neighbors=30,
+        n_neighbors=300,
     output:
         results="hotspot/hotspot.txt"
-    script: "../pipelineScripts/hotspot/runHotspot.py"
-
-rule runHotspot_linear:
-    input:
-        loom=data("data.loom"),
-        latent=rules.extractPositions.output.positions,
-    params:
-        model='bernoulli_L',
-        n_neighbors=300,
-    output:
-        results="hotspot/hotspot_linear.txt"
-    script: "../pipelineScripts/hotspot/runHotspot.py"
-
-rule runHotspot100:
-    input:
-        loom=data("data.loom"),
-        latent=rules.extractPositions.output.positions,
-    params:
-        model='bernoulli',
-        n_neighbors=100,
-    output:
-        results="hotspot/hotspot_100.txt"
-    script: "../pipelineScripts/hotspot/runHotspot.py"
-
-rule runHotspot300:
-    input:
-        loom=data("data.loom"),
-        latent=rules.extractPositions.output.positions,
-    params:
-        model='bernoulli',
-        n_neighbors=300,
-    output:
-        results="hotspot/hotspot_300.txt"
     script: "../pipelineScripts/hotspot/runHotspot.py"
 
 rule runHotspotPairs:
     input:
         loom=data("data.loom"),
         latent=rules.extractPositions.output.positions,
-        hs_results=rules.runHotspot300.output.results,
+        hs_results=rules.runHotspot.output.results,
     params:
         model='bernoulli',
         fdrThresh=0.05,
@@ -117,12 +69,39 @@ rule runHotspotPairs:
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "../pipelineScripts/hotspot/runHotspotPairs.py"
 
+rule runHotspotPairs30:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        hs_results=rules.runHotspot.output.results,
+    params:
+        model='bernoulli',
+        fdrThresh=0.05,
+        n_neighbors=30,
+    output:
+        results_lc="hotspot/hotspot_pairs_lc_n30.txt.gz",
+        results_z="hotspot/hotspot_pairs_z_n30.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules30:
+    input:
+        results_z=rules.runHotspotPairs30.output.results_z,
+    params:
+        min_cluster_genes=20,
+        min_cluster_z=5,
+    output:
+        cluster_diagnostics="hotspot/module_diagnostics_30.png",
+        cluster_heatmap="hotspot/module_heatmap_30.svg",
+        cluster_output="hotspot/modules_30.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+
 # Hotspot pairs, but using the genes from puck 12
 rule runHotspotPairs_Puck12:
     input:
         loom=data("data.loom"),
         latent=rules.extractPositions.output.positions,
-        hs_results="../Puck_180819_12/hotspot/hotspot_300.txt"
+        hs_results=puck12("hotspot/hotspot.txt"),
     params:
         model='bernoulli',
         fdrThresh=0.05,
@@ -152,18 +131,8 @@ rule spatialDE:
         l_min=50,
     threads: 10
     output:
-        results="spatialDE/spatialDE_fixed.txt"
-    script: "../pipelineScripts/SpatialDE/runSpatialDE.py"
-
-rule spatialDE_original:
-    input:
-        loom=data("data.loom"),
-        latent=rules.extractPositions.output.positions,
-    threads: 10
-    output:
         results="spatialDE/spatialDE.txt"
     script: "../pipelineScripts/SpatialDE/runSpatialDE.py"
-
 
 rule spatialDEClusters:
     input:
@@ -192,3 +161,6 @@ rule all:
         rules.TSNE.output.out,
         rules.vision.output.out,
         rules.runHotspotPairs.output,
+        rules.extractHotspotModules.output,
+        rules.runHotspotPairs_Puck12.output,
+        rules.extractHotspotModules30.output,

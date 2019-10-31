@@ -144,17 +144,6 @@ rule runHotspot_shuffled:
         results="hotspot/hotspot_shuffled.txt"
     script: "../../pipelineScripts/hotspot/runHotspot.py"
 
-rule runHotspot_shuffled_linear:
-    input:
-        loom=data("data.loom"),
-        latent=rules.shufflePositions.output.positions,
-    params:
-        model='bernoulli_L',
-        n_neighbors=300,
-    output:
-        results="hotspot/hotspot_shuffled_linear.txt"
-    script: "../../pipelineScripts/hotspot/runHotspot.py"
-
 rule spatialDE_shuffled:
     input:
         loom=data("data.loom"),
