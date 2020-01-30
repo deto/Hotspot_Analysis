@@ -1,0 +1,71 @@
+rule select_pca:
+    input:
+        loom=data(data_file),
+    params:
+        highXMeanCutoff=20,
+    output:
+        genes="genes/pca.txt",
+        geneInfo="genes/pca_info.txt"
+    script: "pipelineScripts/select_pca.R"
+
+rule select_pca_topN:
+    input:
+        geneInfo=rules.select_pca.output.geneInfo,
+    params:
+        N=1000,
+        var="Score",
+        ascending=False,
+    output:
+        genes="genes/pca_topN.txt"
+    script: "pipelineScripts/select_topN.py"
+
+rule PCA_pca:
+    message: "Computing PCA on highly-variable genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_pca_topN.output.genes,
+    output:
+        latent="pca/pca_pca.txt",
+    script: "pipelineScripts/pca/pca.py"
+
+rule SCVI_pca:
+    message: "Computing SCVI on pca genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_pca_topN.output.genes,
+    params:
+        components=10,
+    output:
+        latent="scvi/pca/latent.txt.gz",
+        model="scvi/pca/model.pkl",
+    script: "pipelineScripts/scvi/scviTorch.py"
+
+rule TSNE_pca:
+    message: "Computing TSNE - pca genes"
+    input:
+        latent=rules.SCVI_pca.output.latent,
+    output:
+        out="tsne/tsne_pca.txt",
+    script: "pipelineScripts/tsne/tsne.py"
+
+rule UMAP_pca:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI_pca.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap_pca.txt",
+    script: "pipelineScripts/umap/umap.py"
+
+rule runHotspot_pca_proteins:
+    input:
+        proteins=data(ab_file),
+        latent=rules.SCVI_pca.output.latent,
+    params:
+        model='normal',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_pca_proteins.txt"
+    script: "pipelineScripts/hotspot/runHotspotProteins.py"

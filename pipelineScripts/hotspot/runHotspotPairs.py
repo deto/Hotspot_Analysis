@@ -19,6 +19,21 @@ try:
 except AttributeError:
     topN = None
 
+try:
+    highXMeanCutoff = float(snakemake.params['highXMeanCutoff'])
+except AttributeError:
+    highXMeanCutoff = None
+
+try:
+    use_umi = bool(snakemake.params['use_umi'])
+except AttributeError:
+    use_umi = True
+
+try:
+    genes_file = snakemake.input['genes']
+except AttributeError:
+    genes_file = None
+
 with loompy.connect(loom_file, 'r') as ds:
     barcodes = ds.ca['Barcode'][:]
     counts = ds[:, :]
@@ -32,7 +47,11 @@ hs_results = pd.read_table(hs_results_file, index_col=0)
 gene_info = pd.DataFrame(
     gene_info, columns=['EnsID', 'Symbol']).set_index('EnsID')
 counts = pd.DataFrame(counts, index=gene_info.index, columns=barcodes)
-num_umi = pd.Series(num_umi, index=barcodes)
+
+if use_umi:
+    num_umi = pd.Series(num_umi, index=barcodes)
+else:
+    num_umi = pd.Series(1.0, index=barcodes)
 
 # Align to latent space
 counts = counts.loc[:, latent.index]
@@ -40,17 +59,28 @@ num_umi = num_umi[latent.index]
 
 # need counts, latent, and num_umi
 
-hs = hotspot.Hotspot(counts, latent, num_umi)
+hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
 )
+
+if highXMeanCutoff is not None:
+
+    scaled = counts.divide(counts.sum(axis=0), axis=1)*10000
+    gene_means = scaled.mean(axis=1)
+    valid_genes = gene_means.index[gene_means < highXMeanCutoff]
+    hs_results = hs_results.loc[valid_genes & hs_results.index]
 
 
 if topN is None:
     hs_genes = hs_results.index[hs_results.FDR < fdrThresh]
 else:
     hs_genes = hs_results.sort_values('Z').tail(topN).index
+
+# Overrides the hs results if desired
+if genes_file is not None:
+    hs_genes = pd.Index(pd.read_table(genes_file, header=None).iloc[:, 0].tolist())
 
 hs_genes = hs_genes & counts.index
 

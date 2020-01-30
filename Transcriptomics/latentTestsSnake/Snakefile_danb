@@ -8,12 +8,64 @@ rule select_danb:
         geneInfo="genes/danb_info.txt"
     script: "pipelineScripts/select_danb.R"
 
-rule select_pca:
+rule select_danb_topN:
+    input:
+        geneInfo=rules.select_danb.output.geneInfo,
+    params:
+        N=1000,
+        var="q.value",
+        ascending=True,
+    output:
+        genes="genes/danb_topN.txt"
+    script: "pipelineScripts/select_topN.py"
+
+rule PCA_danb:
+    message: "Computing PCA on highly-variable genes"
     input:
         loom=data(data_file),
-    params:
-        highXMeanCutoff=20,
+        genes=rules.select_danb_topN.output.genes,
     output:
-        genes="genes/pca.txt",
-        geneInfo="genes/pca_info.txt"
-    script: "pipelineScripts/select_pca.R"
+        latent="pca/pca_danb.txt",
+    script: "pipelineScripts/pca/pca.py"
+
+rule SCVI_danb:
+    message: "Computing SCVI on danb genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_danb_topN.output.genes,
+    params:
+        components=10,
+    output:
+        latent="scvi/danb/latent.txt.gz",
+        model="scvi/danb/model.pkl",
+    script: "pipelineScripts/scvi/scviTorch.py"
+
+rule TSNE_danb:
+    message: "Computing TSNE - danb genes"
+    input:
+        latent=rules.SCVI_danb.output.latent,
+    output:
+        out="tsne/tsne_danb.txt",
+    script: "pipelineScripts/tsne/tsne.py"
+
+rule UMAP_danb:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI_danb.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap_danb.txt",
+    script: "pipelineScripts/umap/umap.py"
+
+rule runHotspot_danb_proteins:
+    input:
+        proteins=data(ab_file),
+        latent=rules.SCVI_danb.output.latent,
+    params:
+        model='normal',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_danb_proteins.txt"
+    script: "pipelineScripts/hotspot/runHotspotProteins.py"

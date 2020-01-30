@@ -9,11 +9,22 @@ rule select_hvg:
         geneInfo="genes/hvg_info.txt"
     script: "pipelineScripts/select_hvg.R"
 
+rule select_hvg_topN:
+    input:
+        geneInfo=rules.select_hvg.output.geneInfo,
+    params:
+        N=1000,
+        var="gene.dispersion.scaled",
+        ascending=False,
+    output:
+        genes="genes/hvg_topN.txt"
+    script: "pipelineScripts/select_topN.py"
+
 rule PCA_hvg:
     message: "Computing PCA on highly-variable genes"
     input:
         loom=data(data_file),
-        genes=rules.select_hvg.output.genes,
+        genes=rules.select_hvg_topN.output.genes,
     output:
         latent="pca/pca_hvg.txt",
     script: "pipelineScripts/pca/pca.py"
@@ -22,7 +33,7 @@ rule SCVI_hvg:
     message: "Computing SCVI on hvg genes"
     input:
         loom=data(data_file),
-        genes=rules.select_hvg.output.genes,
+        genes=rules.select_hvg_topN.output.genes,
     params:
         components=10,
     output:
@@ -90,7 +101,7 @@ rule runHotspot_hvg_proteins:
         proteins=data(ab_file),
         latent=rules.SCVI_hvg.output.latent,
     params:
-        model='danb',
+        model='normal',
         n_neighbors=30,
         n_cells_min=10,
     output:

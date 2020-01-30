@@ -2,6 +2,7 @@ include: "Snakefile_all"
 include: "Snakefile_threshold"
 include: "Snakefile_hvg"
 include: "Snakefile_danb"
+include: "Snakefile_pca"
 include: "Snakefile_hs"
 include: "Snakefile_shuffled"
 
@@ -12,13 +13,30 @@ rule runHotspotPairs:
         hs_results=rules.runHotspot_hvg.output.results,
     params:
         model='danb',
-        fdrThresh=0.05,
+        fdrThresh=0.01,
         topN=500,
         n_neighbors=30,
+        highXMeanCutoff=20,
     output:
         results_lc="hotspot/hotspot_pairs_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule runHotspotPairs_null:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_hvg.output.latent,
+        hs_results=rules.runHotspot_hvg.output.results,
+    params:
+        model='danb',
+        fdrThresh=0.01,
+        topN=500,
+        n_neighbors=30,
+        highXMeanCutoff=20,
+    output:
+        results_lc="hotspot/hotspot_pairs_lc_null.txt.gz",
+        results_z="hotspot/hotspot_pairs_z_null.txt.gz"
+    script: "pipelineScripts/hotspot/runHotspotPairs_shuffled.py"
 
 rule runRegularPairs:
     input:
@@ -36,13 +54,27 @@ rule extractHotspotModules:
     input:
         results_z=rules.runHotspotPairs.output.results_z,
     params:
-        min_cluster_genes=10,
-        min_cluster_z=20,
+        min_cluster_genes=15,
+        core_only=True,
+        #z_threshold=1.65,
+        fdr_threshold=.05,
     output:
-        cluster_diagnostics="hotspot/module_diagnostics.png",
         cluster_heatmap="hotspot/module_heatmap.svg",
         cluster_output="hotspot/modules.txt",
+        linkage_output="hotspot/linkage.txt",
     script: "pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule computeModuleScores:
+    input:
+        loom=data("data.loom"),
+        latent=rules.SCVI_hvg.output.latent,
+        modules=rules.extractHotspotModules.output.cluster_output,
+    params:
+        n_neighbors=30,
+        model="danb",
+    output:
+        scores="hotspot/module_scores.txt.gz",
+    script: "pipelineScripts/hotspot/computeModuleScores.py"
 
 rule vision:
     input:
@@ -62,7 +94,9 @@ rule all:
         rules.TSNE.output.out,
         rules.vision.output.out,
         rules.runHotspotPairs.output,
-        rules.runHotspot_hvg.output.results,
-        rules.runHotspot_threshold.output.results,
-        rules.runHotspot_shuffled.output.results,
-
+        rules.runHotspot_hvg.output,
+        rules.runHotspot_threshold.output,
+        rules.runHotspot_shuffled.output,
+        rules.runHotspotPairs_null.output,
+        rules.extractHotspotModules.output,
+        rules.computeModuleScores.output,

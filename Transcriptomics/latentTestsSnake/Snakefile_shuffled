@@ -1,8 +1,8 @@
 rule shuffleLatent:
     input:
-        positions=rules.PCA.output.latent,
+        positions=rules.SCVI_threshold.output.latent,
     output:
-        positions="positions/positions_shuffled.txt"
+        positions="scvi/threshold/latent_shuffled.txt"
     script: "pipelineScripts/shufflePositions.py"
 
 rule runHotspot_shuffled:

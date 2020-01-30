@@ -99,7 +99,7 @@ rule runHotspot_threshold_proteins:
         proteins=data(ab_file),
         latent=rules.SCVI_threshold.output.latent,
     params:
-        model='danb',
+        model='normal',
         n_neighbors=30,
         n_cells_min=10,
     output:

@@ -1,0 +1,20 @@
+rule parseEmbryo3:
+    input:
+        dge="original_data/RNA/embryo3_raw_gene_bc_matrices_h5.h5",
+        characterMatrix="original_data/lineage_tables/0726_E2-2_character_matrix.txt"
+    output:
+        loom=protected("Embryo3/data.loom"),
+        characterMatrix="Embryo3/character_matrix.txt",
+    script: "parse.py"
+
+rule parseEmbryo3_tree:
+    input:
+        tree="original_data/trees/0726_E2-2_tree_greedy_priors.processed.txt"
+    output:
+        tree="Embryo3/tree.txt",
+    shell: "cp {input.tree} {output.tree}"
+
+rule all:
+    input:
+        expand(rules.parseEmbryo3.output),
+        expand(rules.parseEmbryo3_tree.output),

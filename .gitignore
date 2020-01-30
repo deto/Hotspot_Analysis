@@ -1,6 +1,7 @@
 GearyC/*
 python_src*
 old/*
+**/old/*
 *.csv.gz
 *.txt.gz
 *.txt.gz.*
@@ -28,3 +29,6 @@ SlideSeq/DropViz/DropSeq.util*
 .notags
 *.html
 *.pkl
+*.log
+*.Rhistory
+*.RData

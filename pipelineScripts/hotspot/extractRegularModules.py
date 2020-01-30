@@ -1,4 +1,6 @@
 from scipy.cluster.hierarchy import linkage, leaves_list, fcluster
+from scipy.spatial.distance import squareform
+
 import numpy as np
 import pandas as pd
 import __main__ as main
@@ -12,50 +14,59 @@ import seaborn as sns
 from tqdm import tqdm
 import hotspot.modules
 from statsmodels.stats.multitest import multipletests
-from scipy.spatial.distance import squareform
-from scipy.stats import norm
 
 plt.rcParams["svg.fonttype"] = "none"
 
 results_file = snakemake.input["results_z"]
+latent_file = snakemake.input["latent"] # Only used for N cells
 
 MIN_CLUSTER_GENES = snakemake.params["min_cluster_genes"]  # 50
 CORE_ONLY = snakemake.params["core_only"]  # 50
-
-try:
-    Z_THRESHOLD = snakemake.params["z_threshold"]
-except AttributeError:
-    Z_THRESHOLD = 3
+FDR_THRESHOLD = snakemake.params["fdr_threshold"]
 
 
 cluster_heatmap_file = snakemake.output["cluster_heatmap"]
 cluster_output_file = snakemake.output["cluster_output"]
 linkage_output_file = snakemake.output["linkage_output"]
 
-results = pd.read_table(results_file, index_col=0)
-
-# Optionally, FDR Threshold overrides Z threshold
-try:
-    FDR_THRESHOLD = snakemake.params["fdr_threshold"]
-
-    allZ = squareform(results.values/2 + results.values.T/2) # just in case slightly not symmetric
-    allZ = np.sort(allZ)
-    allP = norm.sf(allZ)
-    allP_c = multipletests(allP, method='fdr_bh')[1]
-    ii = np.nonzero(allP_c < FDR_THRESHOLD)[0][0]
-    Z_THRESHOLD = allZ[ii]
-
-    print(FDR_THRESHOLD, Z_THRESHOLD)
-
-except AttributeError:
-    pass
+reg = pd.read_table(results_file, index_col=0)
 
 # %% Compute Linkage and Ordering
 
-modules, Z = hotspot.modules.compute_modules(
-    results, min_gene_threshold=MIN_CLUSTER_GENES,
-    z_threshold=Z_THRESHOLD, core_only=CORE_ONLY
-)
+# Make 'symmetric'
+# Matrix is already symmetric but differences in lower-order bits
+# are causing scipy to complain here
+# Same with diagonal
+
+cdist = 1-reg.values
+cdist = cdist/2 + cdist.T/2  
+np.fill_diagonal(cdist, 0)
+
+Z = linkage(squareform(cdist), method='average')
+
+
+# Find critical T value
+N_CELLS = pd.read_table(latent_file, index_col=0).shape[0]
+from scipy.stats import t
+
+regX = reg.values.copy()
+regX = regX/2 + regX.T/2
+np.fill_diagonal(regX, 0)
+allR = squareform(regX)
+allR = np.sort(allR)
+allT = allR * np.sqrt((N_CELLS-2) / (1-allR**2))
+allP = t.sf(allT, df=N_CELLS-2)
+allP_c = multipletests(allP, method='fdr_bh')[1]
+ii = np.nonzero(allP_c < FDR_THRESHOLD)[0][0]
+Z_THRESHOLD = allR[ii]
+
+print(Z_THRESHOLD)
+
+import hotspot.modules
+modules = hotspot.modules.assign_modules(
+    Z, offset=1, Z_THRESHOLD=Z_THRESHOLD, MIN_THRESHOLD=MIN_CLUSTER_GENES,
+    leaf_labels=reg.index)
+
 
 modules.rename('Cluster').to_frame().to_csv(cluster_output_file, sep="\t")
 linkage_out = pd.DataFrame(Z).to_csv(
@@ -68,16 +79,15 @@ from scipy.cluster.hierarchy import leaves_list
 ii = leaves_list(Z)
 
 colors = list(plt.get_cmap("tab10").colors)
-cm = ScalarMappable(norm=Normalize(0, 0.05, clip=True), cmap="viridis")
 row_colors1 = pd.Series(
     [colors[i % 10] if i != -1 else "#ffffff" for i in modules],
-    index=results.index,
+    index=reg.index,
 )
 
 row_colors = pd.DataFrame({"Cluster": row_colors1})
 
 cm = sns.clustermap(
-    results.iloc[ii, ii],
+    reg.iloc[ii, ii],
     row_cluster=False,
     col_cluster=False,
     vmin=-15,

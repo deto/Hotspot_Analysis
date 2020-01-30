@@ -29,6 +29,16 @@ genes = snakemake.input['genes']
 genes = pd.read_table(genes, header=None).iloc[:, 0].tolist()
 expression = expression.loc[genes]
 
+try:
+    doStandardize = snakemake.params['doStandardize']
+except AttributeError:
+    doStandardize = False
+
+if doStandardize:
+    expression = expression \
+        .subtract(expression.mean(axis=1), axis=0) \
+        .divide(expression.std(axis=1), axis=0)
+
 
 model = PCA(n_components=MAX_COMPONENTS, random_state=0)
 model.fit(expression.values.T)
@@ -61,9 +71,9 @@ try:
             (model.explained_variance_ < null_model.explained_variance_)
         )[0][0]
     else:
-        num_pcs = 20
+        num_pcs = snakemake.params['num_pcs']
 except AttributeError:
-    num_pcs = 20
+    num_pcs = 5
 
 # Diagnostic plot
 xmin = 0
@@ -88,6 +98,7 @@ plt.savefig(os.path.join(out_dir, 'PermutationPA.png'))
 
 pcs = model.fit_transform(expression.values.T)
 pcs = pcs[:, 0:num_pcs]
+gene_components = gene_components.iloc[:, 0:num_pcs]
 
 pcs = pd.DataFrame(pcs, index=expression.columns)
 

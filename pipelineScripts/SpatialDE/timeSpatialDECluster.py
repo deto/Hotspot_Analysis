@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import pandas as pd
 import loompy
 import time
@@ -6,7 +7,6 @@ import json
 
 import NaiveDE
 import SpatialDE
-
 
 # Load some data
 
@@ -19,9 +19,13 @@ sde_results_file = snakemake.input['sde_results']
 
 out_file_hist = snakemake.output['hist']
 out_file_patterns = snakemake.output['patterns']
-out_file_log = os.path.splitext(out_file_hist)[0]+".log"
+out_file_log = snakemake.output['log']
 
 os.makedirs(os.path.dirname(out_file_hist), exist_ok=True)
+
+N_CELLS = int(snakemake.params['N_CELLS'])
+N_GENES = int(snakemake.params['N_GENES'])
+N_JOBS = snakemake.threads
 
 try:
     n_components = snakemake.params['n_components']
@@ -41,7 +45,6 @@ num_umi = pd.Series(num_umi, index=barcodes)
 
 sde_results = pd.read_table(sde_results_file)
 
-print('Filtering Data...')
 # Do some filtering
 valid_genes = (counts > 0).sum(axis=1) > 50
 counts = counts[valid_genes, :]
@@ -50,6 +53,56 @@ gene_info = gene_info.loc[valid_genes]
 counts = counts.T
 
 counts = pd.DataFrame(counts, columns=gene_info.index, index=barcodes)
+
+
+# Find a window around the middle of the space with N_CELLS in it
+def find_window(latent, N_CELLS):
+    X = latent.iloc[:, 0].values
+    Y = latent.iloc[:, 1].values
+    midX = np.median(X)
+    midY = np.median(Y)
+
+    scaleX = X.max() - X.min()
+    scaleY = Y.max() - Y.min()
+
+    widthXMin = 0
+    widthXMax = scaleX
+    widthYMin = 0
+    widthYMax = scaleY
+
+    for _ in range(100):
+
+        testX = (widthXMax + widthXMin)/2
+        testY = (widthYMax + widthYMin)/2
+
+        inWin = (
+            (X < midX + testX/2) & (X > midX - testX/2) &
+            (Y < midY + testY/2) & (Y > midY - testY/2)
+        )
+
+        cellsInWin = inWin.sum()
+
+        if cellsInWin > N_CELLS:
+            widthXMax = testX
+            widthYMax = testY
+        elif cellsInWin < N_CELLS:
+            widthXMin = testX
+            widthYMin = testY
+        else:
+            break
+
+        if abs(cellsInWin - N_CELLS) <= 1:
+            break
+
+    else:
+        raise Exception("Bad window convergence")
+
+    return inWin
+
+
+cellsInWin = find_window(latent, N_CELLS)
+latent = latent.loc[cellsInWin]
+
 
 # Subset counts/num_umi for only the barcodes in the window
 counts = counts.loc[latent.index]
@@ -72,7 +125,7 @@ resid_expr = NaiveDE.regress_out(
 X = sample_info[['Comp1', 'Comp2']].values
 
 # Pick results subset
-sde_results_sub = sde_results.sort_values('LLR').tail(500)
+sde_results_sub = sde_results.sort_values('LLR').tail(N_GENES)
 
 # Pick l=350 as average is around 300
 L = 350
@@ -88,9 +141,6 @@ stop_time = time.time()
 print('Saving Results...')
 histology_results.to_csv(out_file_hist, sep="\t")
 patterns.to_csv(out_file_patterns, sep="\t")
-
-N_GENES = sde_results_sub.shape[0]
-N_CELLS = X.shape[0]
 
 out = {
     'Genes': N_GENES,

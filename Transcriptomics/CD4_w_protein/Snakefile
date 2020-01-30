@@ -13,4 +13,3 @@ rule computeGRScores:
     output:
         out="evaluation/geneRelevanceScores.txt"
     script: "scripts/computeGeneRelevanceScores.py"
-

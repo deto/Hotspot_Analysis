@@ -1,0 +1,40 @@
+# This version differs from Simulated3 in that
+# we only vary the synthesis parameter and not
+# all three
+
+rule simdata:
+    output:
+        cell_effects="rep{N}/cell_effects.txt",
+        gene_effects="rep{N}/gene_effects.txt",
+        gene_indices="rep{N}/gene_indices.txt",
+        true_counts="rep{N}/true_counts.txt.gz",
+        obs_counts="rep{N}/observed_counts.txt.gz",
+    params:
+        strength=8
+    script: "symulateCounts.R"
+
+rule test_simdata:
+    output:
+        cell_effects="str{S}/cell_effects.txt",
+        gene_effects="str{S}/gene_effects.txt",
+        gene_indices="str{S}/gene_indices.txt",
+        true_counts="str{S}/true_counts.txt.gz",
+        obs_counts="str{S}/observed_counts.txt.gz",
+    params:
+        strength="{S}"
+    script: "symulateCounts.R"
+
+rule test_strengths:
+    input:
+        "str2/cell_effects.txt",
+        "str4/cell_effects.txt",
+        "str6/cell_effects.txt",
+        "str8/cell_effects.txt",
+        "str10/cell_effects.txt",
+
+rule makeLoom:
+    input:
+        obs="rep{N}/observed_counts.txt.gz",
+    output:
+        loom=protected("rep{N}/data.loom"),
+    script: "createLoom.py"

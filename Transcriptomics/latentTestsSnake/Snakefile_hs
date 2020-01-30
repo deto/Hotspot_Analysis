@@ -2,7 +2,7 @@
 
 rule select_hs:
     input:
-        hs_results=rules.runHotspot_hvg.output.results,
+        hs_results=rules.runHotspot_threshold_pca.output.results,
     params:
         fdrThresh=0.05,
         cThresh=0.05,
@@ -10,11 +10,22 @@ rule select_hs:
         genes="genes/hs.txt"
     script: "pipelineScripts/select_hs.py"
 
+rule select_hs_topN:
+    input:
+        geneInfo=rules.runHotspot_threshold_pca.output.results,
+    params:
+        N=1000,
+        var="Z",
+        ascending=False,
+    output:
+        genes="genes/hs_topN.txt"
+    script: "pipelineScripts/select_topN.py"
+
 rule PCA_hs:
     message: "Computing PCA on highly-variable genes"
     input:
         loom=data(data_file),
-        genes=rules.select_hs.output.genes,
+        genes=rules.select_hs_topN.output.genes,
     output:
         latent="pca/pca_hs.txt",
     script: "pipelineScripts/pca/pca.py"
@@ -23,7 +34,7 @@ rule SCVI_hs:
     message: "Computing SCVI on hs genes"
     input:
         loom=data(data_file),
-        genes=rules.select_hs.output.genes,
+        genes=rules.select_hs_topN.output.genes,
     params:
         components=10,
     output:
@@ -54,7 +65,7 @@ rule runHotspot_hs_proteins:
         proteins=data(ab_file),
         latent=rules.SCVI_hs.output.latent,
     params:
-        model='danb',
+        model='normal',
         n_neighbors=30,
         n_cells_min=10,
     output:

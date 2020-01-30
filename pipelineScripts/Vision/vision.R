@@ -1,4 +1,4 @@
-devtools::load_all("/data/yosef2/users/david.detomaso/repos/VISION-ADT")
+devtools::load_all("/data/yosef2/users/david.detomaso/repos/VISION")
 library(loomR)
 
 loom_file <- snakemake@input[["loom"]]
@@ -14,8 +14,13 @@ expression <- t(ds$layers$scaled[, ])
 meta <- lapply(
     setNames(names(ds$col.attrs), names(ds$col.attrs)),
     function(col) {
-        ds$col.attrs[[col]][]
+        if (length(ds$col.attrs[[col]]$dims) > 1){
+            NULL
+        } else {
+            ds$col.attrs[[col]][]
+        }
     })
+meta <- meta[!sapply(meta, is.null)]
 meta <- data.frame(meta)
 rownames(meta) <- meta$Barcode
 meta$Barcode <- NULL
@@ -83,7 +88,7 @@ if ("latent" %in% names(snakemake@input)){
 wd <- getwd()
 name <- basename(wd)
 
-projection_methods <- c("tSNE30")
+projection_methods <- c("tSNE30", "UMAP")
 if ("tsne" %in% names(snakemake@input) || "umap" %in% names(snakemake@input) ||
     any(startsWith(names(snakemake@input), "proj_"))) {
     projection_methods <- character()

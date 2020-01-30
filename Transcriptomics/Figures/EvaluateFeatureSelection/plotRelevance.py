@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import loompy
+import seaborn as sns
+
+plt.rcParams['svg.fonttype'] = 'none'
 
 hs = pd.read_table("../../CD4_w_protein/hotspot/hotspot_hvg.txt", index_col=0)
 hvg_ens = pd.read_table("../../CD4_w_protein/genes/hvg.txt", header=None)[0].tolist()
@@ -55,11 +58,11 @@ hvg_info = hvg_info.loc[hs.index]
 danb_info = danb_info.loc[hs.index]
 pca_info = pca_info.loc[hs.index]
 data = pd.DataFrame({
-    'HS': hs.Z,
+    'Hotspot': hs.Z,
     'HSth': hs_th.Z,
     'HSpc': hs_pc.Z,
-    'Hvg': hvg_info['gene.dispersion.scaled'],
-    'DANB': -1*np.log10(danb_info['q.value']+1e-300),
+    'HVG': hvg_info['gene.dispersion.scaled'],
+    'NBDisp': -1*np.log10(danb_info['q.value']+1e-300),
     'PCA': pca_info['Score'],
 })
 
@@ -74,26 +77,39 @@ data = data.loc[data.Mean <= 20]
 
 plt.figure()
 
+colors = sns.color_palette('deep')
+colormap = {
+    'Hotspot': colors[0],
+    'HVG': colors[1],
+    'NBDisp': colors[2],
+    'PCA': colors[3],
+}
+
 def plot_individual(data, variable):
     d_sub = data[[variable, 'GR']].sort_values(variable, ascending=False)
     d_sub['Rank'] = np.arange(d_sub.shape[0])+1
     d_sub['GR_mean'] = d_sub['GR'].cumsum() / d_sub['Rank']
 
-    plt.plot(d_sub['Rank'], d_sub['GR_mean'], '-', label=variable)
+    plt.plot(d_sub['Rank'], d_sub['GR_mean'], '-',
+             label=variable, color=colormap[variable])
 
-plot_individual(data, 'HS')
-plot_individual(data, 'Hvg')
-plot_individual(data, 'DANB')
+plot_individual(data, 'Hotspot')
+plot_individual(data, 'HVG')
+plot_individual(data, 'NBDisp')
 plot_individual(data, 'PCA')
 
-plt.xlim(5, data.shape[0])
+# plt.xlim(5, data.shape[0])
+plt.xlim(5, 3000)
+plt.ylim(10, 50)
 plt.xlabel("# of Genes")
 plt.ylabel("Mean Gene-Relevance Score")
 
 plt.legend()
 plt.title('GR Scores\nAll Genes in at least 10 cells')
-plt.show()
-#plt.savefig('GeneRelevance_noThresh.svg')
+plt.grid(color='#dddddd', linestyle=(0, (5, 5)))
+plt.gca().set_axisbelow(True)
+#plt.show()
+plt.savefig('GeneRelevance_noThresh.svg')
 
 # %% Second plot - only genes above a threshold of np.exp(0.1) - 1
 
@@ -108,11 +124,12 @@ def plot_individual(data, variable):
     d_sub['Rank'] = np.arange(d_sub.shape[0])+1
     d_sub['GR_mean'] = d_sub['GR'].cumsum() / d_sub['Rank']
 
-    plt.plot(d_sub['Rank'], d_sub['GR_mean'], '-', label=variable)
+    plt.plot(d_sub['Rank'], d_sub['GR_mean'], '-', label=variable,
+             color=colormap[variable])
 
-plot_individual(dataT, 'HS')
-plot_individual(dataT, 'Hvg')
-plot_individual(dataT, 'DANB')
+plot_individual(dataT, 'Hotspot')
+plot_individual(dataT, 'HVG')
+plot_individual(dataT, 'NBDisp')
 plot_individual(dataT, 'PCA')
 
 
@@ -122,10 +139,11 @@ plt.ylabel("Mean Gene-Relevance Score")
 
 plt.legend()
 plt.title('GR Scores\nAll Genes With Mean Expression > 0.1 CP10K')
-plt.show()
-#plt.savefig('GeneRelevance_Thresh.svg')
+#plt.show()
+plt.savefig('GeneRelevance_Thresh.svg')
 
 # %% Compare different HS results here too:
+# They are essentially all the same
 
 plt.figure()
 
@@ -140,7 +158,7 @@ def plot_individual(data, variable):
 
     plt.plot(d_sub['Rank'], d_sub['GR_mean'], '-', label=variable)
 
-plot_individual(dataT, 'HS')
+plot_individual(dataT, 'Hotspot')
 plot_individual(dataT, 'HSth')
 plot_individual(dataT, 'HSpc')
 
@@ -149,4 +167,4 @@ plt.xlabel("# of Genes")
 plt.ylabel("Mean Gene-Relevance Score")
 
 plt.legend()
-plt.show()
+plt.savefig('GeneRelevance_HSComparison.svg')

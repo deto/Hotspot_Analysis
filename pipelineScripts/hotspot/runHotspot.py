@@ -19,6 +19,16 @@ try:
 except AttributeError:
     n_cells_min = 50
 
+try:
+    use_umi = bool(snakemake.params['use_umi'])
+except AttributeError:
+    use_umi = True
+
+try:
+    weighted_graph = snakemake.params['weighted_graph']
+except AttributeError:
+    weighted_graph = False
+
 with loompy.connect(loom_file, 'r') as ds:
     barcodes = ds.ca['Barcode'][:]
     counts = ds[:, :]
@@ -31,7 +41,11 @@ latent = pd.read_table(latent_file, index_col=0)
 gene_info = pd.DataFrame(
     gene_info, columns=['EnsID', 'Symbol']).set_index('EnsID')
 counts = pd.DataFrame(counts, index=gene_info.index, columns=barcodes)
-num_umi = pd.Series(num_umi, index=barcodes)
+
+if use_umi:
+    num_umi = pd.Series(num_umi, index=barcodes)
+else:
+    num_umi = pd.Series(1.0, index=barcodes)
 
 # Align to latent space
 counts = counts.loc[:, latent.index]
@@ -42,10 +56,10 @@ num_umi = num_umi[latent.index]
 valid_genes = (counts > 0).sum(axis=1) >= n_cells_min
 counts = counts.loc[valid_genes]
 
-hs = hotspot.Hotspot(counts, latent, num_umi)
+hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
 
 hs.create_knn_graph(
-    weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
+    weighted_graph=weighted_graph, n_neighbors=n_neighbors, neighborhood_factor=3
 )
 
 results = hs.compute_hotspot(model=model, jobs=5, centered=True)

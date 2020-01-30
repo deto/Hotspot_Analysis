@@ -55,7 +55,7 @@ genes_sub = np.random.choice(valid_genes, N_GENES, replace=False)
 counts = counts.iloc[genes_sub, :]
 
 start = time.time()
-hs = hotspot.Hotspot(counts, latent, num_umi)
+hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=False, n_neighbors=N_NEIGHBORS, neighborhood_factor=3
