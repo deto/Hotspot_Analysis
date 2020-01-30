@@ -191,6 +191,25 @@ rule spatialDEClusters_windowed10:
         patterns="spatialDE/patterns_windowed_10.txt",
     script: "../../pipelineScripts/SpatialDE/runSpatialDECluster.py"
 
+rule runHotspotPairsShuffled:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        hs_results=rules.runHotspot.output.results,
+    params:
+        model='bernoulli',
+        fdrThresh=0.05,
+        n_neighbors=30,
+    output:
+        results_lc="hotspot/hotspot_pairs_shuffled_lc.txt.gz",
+        results_z="hotspot/hotspot_pairs_shufled_z.txt.gz"
+    script: "../../pipelineScripts/hotspot/runHotspotPairs_shuffled.py"
+
+
+#################
+#  Timing Tests #
+#################
+
 rule timeHotspot:
     input:
         loom=data("data.loom"),
@@ -205,6 +224,21 @@ rule timeHotspot:
         results="hotspot/timing/{N_GENES}_{N_CELLS}_timing.txt"
     script: "../../pipelineScripts/hotspot/timeHotspot.py"
 
+rule timeHotspotPairs:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        hs_results=rules.runHotspot.output.results,
+    params:
+        model='bernoulli',
+        n_neighbors=300,
+        N_GENES='{N_GENES}',
+        N_CELLS='{N_CELLS}',
+    threads: 16
+    output:
+        results="hotspot/timing_pairs/{N_GENES}_{N_CELLS}_timing.txt"
+    script: "../../pipelineScripts/hotspot/timeHotspotPairs.py"
+
 rule timeSpatialDE:
     input:
         loom=data("data.loom"),
@@ -217,7 +251,28 @@ rule timeSpatialDE:
         results="spatialDE/timing/{N_GENES}_{N_CELLS}_timing.txt"
     script: "../../pipelineScripts/SpatialDE/timeSpatialDe.py"
 
+rule timeSpatialDEClusters:
+    input:
+        loom=data("data.loom"),
+        latent=rules.windowPositions.output.positions,
+        sde_results=rules.spatialDE.output.results,
+    params:
+        n_components=10,
+        N_GENES='{N_GENES}',
+        N_CELLS='{N_CELLS}',
+    threads: 16
+    output:
+        hist="spatialDE/timing_pairs/histology_{N_GENES}_{N_CELLS}.txt",
+        patterns="spatialDE/timing_pairs/patterns_{N_GENES}_{N_CELLS}.txt",
+        log="spatialDE/timing_pairs/log_{N_GENES}_{N_CELLS}.json",
+    script: "../../pipelineScripts/SpatialDE/timeSpatialDECluster.py"
+
 rule timings:
     input: 
         expand(rules.timeHotspot.output.results, N_GENES=[500, 1000, 2000, 4000], N_CELLS=[5000, 10000, 20000]),
         expand(rules.timeSpatialDE.output.results, N_GENES=[500, 1000, 2000, 4000], N_CELLS=[5000, 10000, 20000]),
+
+rule timingsPairs:
+    input: 
+        expand(rules.timeHotspotPairs.output.results, N_GENES=[200, 500, 1000], N_CELLS=[1000, 2000, 5000, 10000]),
+        expand(rules.timeSpatialDEClusters.output.log, N_GENES=[500], N_CELLS=[1000, 2000, 5000, 10000]),

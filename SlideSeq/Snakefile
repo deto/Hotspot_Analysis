@@ -63,38 +63,11 @@ rule runHotspotPairs:
     params:
         model='bernoulli',
         fdrThresh=0.05,
-        n_neighbors=300,
+        n_neighbors=30,
     output:
         results_lc="hotspot/hotspot_pairs_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "../pipelineScripts/hotspot/runHotspotPairs.py"
-
-rule runHotspotPairs30:
-    input:
-        loom=data("data.loom"),
-        latent=rules.extractPositions.output.positions,
-        hs_results=rules.runHotspot.output.results,
-    params:
-        model='bernoulli',
-        fdrThresh=0.05,
-        n_neighbors=30,
-    output:
-        results_lc="hotspot/hotspot_pairs_lc_n30.txt.gz",
-        results_z="hotspot/hotspot_pairs_z_n30.txt.gz"
-    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
-
-rule extractHotspotModules30:
-    input:
-        results_z=rules.runHotspotPairs30.output.results_z,
-    params:
-        min_cluster_genes=20,
-        min_cluster_z=5,
-    output:
-        cluster_diagnostics="hotspot/module_diagnostics_30.png",
-        cluster_heatmap="hotspot/module_heatmap_30.svg",
-        cluster_output="hotspot/modules_30.txt",
-    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
-
 
 # Hotspot pairs, but using the genes from puck 12
 rule runHotspotPairs_Puck12:
@@ -105,7 +78,7 @@ rule runHotspotPairs_Puck12:
     params:
         model='bernoulli',
         fdrThresh=0.05,
-        n_neighbors=300,
+        n_neighbors=30,
     output:
         results_lc="hotspot/hotspot_pairs_lc_12.txt.gz",
         results_z="hotspot/hotspot_pairs_z_12.txt.gz"
@@ -116,12 +89,26 @@ rule extractHotspotModules:
         results_z=rules.runHotspotPairs.output.results_z,
     params:
         min_cluster_genes=20,
-        min_cluster_z=10,
+        core_only=False,
+        #z_threshold=1.65,
+        fdr_threshold=.05,
     output:
-        cluster_diagnostics="hotspot/module_diagnostics.png",
         cluster_heatmap="hotspot/module_heatmap.svg",
         cluster_output="hotspot/modules.txt",
+        linkage_output="hotspot/linkage.txt",
     script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule computeModuleScores:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        modules=rules.extractHotspotModules.output.cluster_output,
+    params:
+        n_neighbors=30,
+        model="bernoulli",
+    output:
+        scores="hotspot/module_scores.txt.gz",
+    script: "../pipelineScripts/hotspot/computeModuleScores.py"
 
 rule spatialDE:
     input:
@@ -163,4 +150,4 @@ rule all:
         rules.runHotspotPairs.output,
         rules.extractHotspotModules.output,
         rules.runHotspotPairs_Puck12.output,
-        rules.extractHotspotModules30.output,
+        rules.computeModuleScores.output,

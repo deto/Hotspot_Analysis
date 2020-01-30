@@ -6,13 +6,13 @@ import seaborn as sns
 # %% Need to gather all the timings
 
 data = []
-for results in glob.glob("../Puck_180819_12/hotspot/timing/*.txt"):
+for results in glob.glob("../../Puck_180819_12/hotspot/timing/*.txt"):
     data.append(pd.read_table(results))
 
 data = pd.concat(data, axis=0)
 
 data_sd = []
-for results in glob.glob("../Puck_180819_12/spatialDE/timing/*.txt"):
+for results in glob.glob("../../Puck_180819_12/spatialDE/timing/*.txt"):
     data_sd.append(pd.read_table(results))
 
 data_sd = pd.concat(data_sd, axis=0)

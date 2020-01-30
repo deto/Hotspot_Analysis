@@ -5,14 +5,16 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+plt.rcParams['svg.fonttype'] = 'none'
+
 
 # %% Load HS Results for each puck
 
 puck_analysis_dirs = {
-    '9': '../Puck_180819_9/',
-    '10': '../Puck_180819_10/',
-    '11': '../Puck_180819_11/',
-    '12': '../Puck_180819_12/',
+    '9': '../../Puck_180819_9/',
+    '10': '../../Puck_180819_10/',
+    '11': '../../Puck_180819_11/',
+    '12': '../../Puck_180819_12/',
 }
 puck_data_dirs = {
     '9': '../../data/SlideSeq/Puck_180819_9',
@@ -47,14 +49,12 @@ hs_pairs = {k: load_hs_pairs(v) for k, v in puck_analysis_dirs.items()}
 
 # %%  compute ordering
 
+Z = pd.read_table('../../Puck_180819_12/hotspot/linkage.txt', header=None).values
+pairs12 = hs_pairs['12']
 
-z0 = hs_pairs['12']
+ii = leaves_list(Z)
 
-ii = leaves_list(
-    linkage(z0, method='average', metric='cosine')
-)
-
-ig = z0.index[ii]
+ig = pairs12.index[ii]
 
 # %% plot clustering
 
@@ -80,5 +80,5 @@ for ax, sample in zip(axs.ravel(), hs_pairs):
     plt.ylabel('')
     plt.title('Puck_180819_{}'.format(sample))
 
-plt.show()
-#plt.savefig('moduleReproducibility.svg', dpi=300)
+# plt.show()
+plt.savefig('moduleReproducibility.svg', dpi=300)

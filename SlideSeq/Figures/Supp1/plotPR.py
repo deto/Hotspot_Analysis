@@ -9,7 +9,7 @@ import loompy
 
 # %% First get the markers from DropViz data
 
-marker_de = pd.read_table("../DropViz/ranksums_markers_1vAll.txt")
+marker_de = pd.read_table("../../DropViz/ranksums_markers_1vAll.txt")
 
 groups = {
     l: marker_de.loc[marker_de.level == l].set_index('gene')
@@ -43,17 +43,17 @@ print(len(all_markers_norm))
 
 
 hs_files = [
-    "../Puck_180819_9/hotspot/hotspot_300.txt",
-    "../Puck_180819_10/hotspot/hotspot_300.txt",
-    "../Puck_180819_11/hotspot/hotspot_300.txt",
-    "../Puck_180819_12/hotspot/hotspot_300.txt",
+    "../../Puck_180819_9/hotspot/hotspot.txt",
+    "../../Puck_180819_10/hotspot/hotspot.txt",
+    "../../Puck_180819_11/hotspot/hotspot.txt",
+    "../../Puck_180819_12/hotspot/hotspot.txt",
 ]
 
 sde_files = [
-    "../Puck_180819_9/spatialDE/spatialDE_fixed.txt",
-    "../Puck_180819_10/spatialDE/spatialDE_fixed.txt",
-    "../Puck_180819_11/spatialDE/spatialDE_fixed.txt",
-    "../Puck_180819_12/spatialDE/spatialDE_fixed.txt",
+    "../../Puck_180819_9/spatialDE/spatialDE.txt",
+    "../../Puck_180819_10/spatialDE/spatialDE.txt",
+    "../../Puck_180819_11/spatialDE/spatialDE.txt",
+    "../../Puck_180819_12/spatialDE/spatialDE.txt",
 ]
 
 # %% Make a ROC Curve
@@ -108,7 +108,7 @@ pucks = [
 
 puck_means = {}
 for puck in pucks:
-    ls = loompy.connect("../../data/SlideSeq/{}/data.loom".format(puck), mode="r")
+    ls = loompy.connect("../../../data/SlideSeq/{}/data.loom".format(puck), mode="r")
     counts = ls.layers['scaled'][:, :]
     gene_info = ls.ra['EnsID', 'Symbol']
     ls.close()
@@ -250,7 +250,13 @@ sns.stripplot(x='Method', y='AUPR', data=auprs)
 #plt.ylim(0, 1)
 plt.show()
 
+# Mean-method has much lower precision
+# Not going to use to final figure, but good to know
+
 # %% Now create the final figure
+
+hs_color = sns.color_palette("deep")[0]
+sde_color = sns.color_palette("deep")[2]
 
 auprs = []
 
@@ -277,7 +283,7 @@ for ff in hs_files:
     auprs.append([aupr, 'Hotspot'])
 
     label = 'Hotspot' if ff == hs_files[-1] else None
-    plt.plot(recall, precision, color='blue', label=label)
+    plt.plot(recall, precision, color=hs_color, label=label)
 
 for ff in sde_files:
     res = pd.read_table(ff, index_col=0)
@@ -293,7 +299,7 @@ for ff in sde_files:
     auprs.append([aupr, 'spatialDE'])
 
     label = 'spatialDE' if ff == sde_files[-1] else None
-    plt.plot(recall, precision, color='green', label=label)
+    plt.plot(recall, precision, color=sde_color, label=label)
 
 plt.xlabel('Recall')
 plt.ylabel('Precision')
@@ -306,12 +312,12 @@ plt.legend()
 plt.sca(axs[1])
 auprs = pd.DataFrame(auprs, columns=['AUPR', 'Method'])
 
-sns.stripplot(x='Method', y='AUPR', data=auprs, jitter=True)
+sns.stripplot(x='Method', y='AUPR', data=auprs, jitter=True, palette=[hs_color, sde_color])
 plt.ylim(0, .6)
 plt.xlabel('')
 axs[1].set_axisbelow(True)
 plt.grid(color='#CCCCCC', axis='y', dashes=[3, 3], lw=1)
-plt.xticks(rotation=70)
+plt.xticks(rotation=45)
 plt.subplots_adjust(bottom=0.2)
-#plt.show()
+# plt.show()
 plt.savefig('AUPRs.svg')

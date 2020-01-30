@@ -2,17 +2,25 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import json
 plt.rcParams['svg.fonttype'] = 'none'
 
+# %% Load things
+
 results_hs = pd.read_table(
-    "../Puck_180819_12/hotspot/hotspot.txt",
+    "../../Puck_180819_12/hotspot/hotspot.txt",
     index_col=0
 )
+
+
+name_map_r = json.load(open("module_name_map.json"))
+name_map = {v: k for k, v in name_map_r.items()}
+
 
 # %% Load clusters
 
 clusters = pd.read_table(
-    "../Puck_180819_12/hotspot/modules.txt", index_col=0
+    "../../Puck_180819_12/hotspot/modules.txt", index_col=0
 ).Cluster
 
 cluster_map = {}
@@ -27,7 +35,7 @@ valid_clusters = [x for x in cluster_map if x != -1]
 # %% Load markers
 
 
-markers_df = pd.read_table("../DropViz/edger_markers_1vAll.txt")
+markers_df = pd.read_table("../../DropViz/edger_markers_1vAll.txt")
 
 N = 200
 markers = {}
@@ -100,29 +108,68 @@ for celltype in markers:
             len(cluster_genes | marker_genes)
         fcs.loc[cluster, celltype] = fc
 
-cm = sns.clustermap(
-    np.log2(fcs).T,
-    metric='correlation',
+
+from scipy.cluster.hierarchy import linkage, leaves_list
+
+
+dat = np.log2(fcs).T
+dat.columns = [name_map[i] for i in dat.columns]
+dat = dat.loc[:, dat.columns.sort_values()]
+
+Z = linkage(dat, metric='correlation')
+ii = leaves_list(Z)
+
+dat = dat.iloc[ii, :]
+
+order = [
+    "Purkinje Neurons",
+    "Bergmann Glia",
+    "Oligo/poly-dendrocytes",
+    "Choroid Plexus",
+    "Endothelial Tip / Mural",
+    "Endothelial Stalk",
+    "Other Neurons",
+    "Cerebellum Basket Cells",
+    "Granule Cells",
+    "Resident Macrophages",
+    "Astrocytes",
+]
+
+dat = dat.loc[order, ]
+
+
+cmap = sns.diverging_palette(230, 20, sep=20, s=85, l=50, as_cmap=True)
+#cmap = "RdBu_r"
+
+fig = plt.figure(figsize=(7, 7))
+
+sns.heatmap(
+    dat,
     vmin=-4,
     vmax=4,
-    cmap="RdBu_r",
-    col_cluster=False,
-    figsize=(7, 7),
-    rasterized=True
+    cmap=cmap,
+    cbar_kws=dict(
+        fraction=0.1,
+        pad=0.1,
+        shrink=.25,
+        aspect=10,
+        panchor=(1.0, 0.5),
+        ticks=[-3, 0, 3],
+        label='Fold-Change\n($log_2$)'
+    ),
 )
 
-fig = plt.gcf()
 fig.patch.set_visible(False)
-plt.sca(cm.ax_heatmap)
 plt.xlabel('Gene Module')
-plt.subplots_adjust(bottom=.2, right=.7)
+plt.xticks(rotation=45)
+plt.subplots_adjust(left=0.3, bottom=.2, right=.9)
 plt.savefig('Module_Cell_Correspondence.svg', dpi=300)
-#plt.show()
+# plt.show()
 
 # %% Try with sub-clusters instead
 
-anno = pd.read_excel("../DropViz/annotation.BrainCellAtlas_Saunders_version_2018.04.01.xlsx")
-markers_df = pd.read_table("../DropViz/edger_markers_1vAll_subcluster.txt")
+anno = pd.read_excel("../../DropViz/annotation.BrainCellAtlas_Saunders_version_2018.04.01.xlsx")
+markers_df = pd.read_table("../../DropViz/edger_markers_1vAll_subcluster.txt")
 
 N = 200
 markers = {}
@@ -199,5 +246,6 @@ sns.clustermap(
 plt.subplots_adjust(bottom=.1, right=.5)
 fig = plt.gcf()
 fig.patch.set_visible(False)
-plt.savefig('Module_SubCell_Correspondence.svg', dpi=300)
-#plt.show()
+# plt.savefig('Module_SubCell_Correspondence.svg', dpi=300)
+# I don't see the advantage to using this granularity on this data
+plt.show()

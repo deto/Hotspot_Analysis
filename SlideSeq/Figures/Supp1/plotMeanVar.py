@@ -2,9 +2,10 @@ import loompy
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 
-ds = loompy.connect("../../data/SlideSeq/Puck_180819_12/data.loom", mode="r")
+ds = loompy.connect("../../../data/SlideSeq/Puck_180819_12/data.loom", mode="r")
 
 scaled = ds.layer['scaled'][:, :]
 counts = ds.layer[''][:, :]
@@ -40,7 +41,7 @@ plt.show()
 
 # %% Load hotspot results
 
-hs_file = "../Puck_180819_12/hotspot/hotspot.txt"
+hs_file = "../../Puck_180819_12/hotspot/hotspot.txt"
 hs_results = pd.read_table(hs_file, index_col=0)
 
 hs_genes = hs_results.index[hs_results.FDR < .05]
@@ -51,12 +52,14 @@ hs_C = np.array([hs_C_d[i] if i in hs_C_d else 0 for i in symbol])
 
 
 # %% Plot w/ HS
-colors = plt.get_cmap('tab10').colors
+color_hs = sns.color_palette('deep')[2]
+color_too_low = '#DDDDDD'
+color_not_sig = '#CCCCCC'
 
 plt.figure(figsize=(4, 4))
-plt.plot(mu[hs_xx], fano[hs_xx], 'o', ms=1, color='#DDDDDD')
-plt.plot(mu[~hs_xx], fano[~hs_xx], 'o', ms=1, color='#CCCCCC')
-ll = plt.plot(mu[hs_ii], fano[hs_ii], 'o', ms=1, color=colors[2])[0]
+plt.plot(mu[hs_xx], fano[hs_xx], 'o', ms=1, color=color_too_low, rasterized=True)
+plt.plot(mu[~hs_xx], fano[~hs_xx], 'o', ms=1, color=color_not_sig, rasterized=True)
+ll = plt.plot(mu[hs_ii], fano[hs_ii], 'o', ms=1, color=color_hs, rasterized=True)[0]
 plt.xscale('log')
 plt.yscale('log')
 plt.xlabel(r'Mean ($\frac{Counts}{10k}$)')
@@ -64,37 +67,4 @@ plt.ylabel('Variance / Mean')
 plt.legend([ll], ['HS-Selected'], markerscale=3, loc='lower right')
 plt.subplots_adjust(left=.2, bottom=.2)
 # plt.show()
-plt.savefig('slideseq_meanvar.svg')
-
-# %% Hover plot
-
-from bio_utils.plots import hover_plot
-
-hover_plot(
-    mu,
-    var/mu,
-    symbol,
-    'o', ms=1)
-plt.xscale('log')
-plt.xlabel(r'Mean ($\frac{Counts}{10k}$)')
-plt.ylabel('Variance / Mean')
-plt.show()
-
-# %% Plot w/ C
-
-df_all = pd.DataFrame({
-    'mu': mu,
-    'var': var,
-    'fano': var/mu,
-    'C': hs_C,
-}, index=symbol)
-
-df_all = df_all.sort_values('C')
-
-plt.figure()
-plt.scatter(df_all['mu'], df_all['fano'], s=1, c=df_all['C'], vmin=-.05, vmax=.15, cmap="bone_r")
-plt.xscale('log')
-plt.xlabel(r'Mean ($\frac{Counts}{10k}$)')
-plt.ylabel('Variance / Mean')
-plt.colorbar()
-plt.show()
+plt.savefig('slideseq_meanvar.svg', dpi=300)
