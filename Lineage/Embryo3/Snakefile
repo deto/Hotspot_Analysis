@@ -1,0 +1,303 @@
+subworkflow data:
+    workdir:
+        "../../data/Lineage/"
+
+LOOM_FILE = "Embryo3/data.loom"
+CM_FILE = "Embryo3/character_matrix.txt"
+TREE_FILE = "Embryo3/tree.txt"
+
+rule select_genes:
+    input:
+        loom=data(LOOM_FILE),
+    output:
+        genes="genes/selected.txt"
+    script: "../../pipelineScripts/select_all.py"
+
+rule PCA:
+    message: "Computing PCA"
+    input:
+        loom=data(LOOM_FILE),
+        genes=rules.select_genes.output.genes,
+    output:
+        latent="pca/pca.txt",
+    script: "../../pipelineScripts/pca/pca.py"
+
+rule TSNE:
+    message: "Computing TSNE"
+    input:
+        latent=rules.PCA.output.latent,
+    output:
+        out="tsne/tsne.txt",
+    script: "../../pipelineScripts/tsne/tsne.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="umap/umap.txt",
+    script: "../../pipelineScripts/umap/umap.py"
+
+rule cluster_threshold:
+    message: "Creating clusters on PCA"
+    input:
+        latent=rules.PCA.output.latent,
+        tsne=rules.TSNE.output.out,
+    params:
+        n_neighbors=30,
+        resolution=1,
+    output:
+        cluster_colors="clusters/cluster_colors_threshold.json",
+        cluster_plot="clusters/cluster_threshold.png",
+        clusters="clusters/clusters_threshold.txt",
+    script: "../../pipelineScripts/cluster/makeClusters.py"
+
+rule vision:
+    input:
+        loom=data(LOOM_FILE),
+        latent=rules.PCA.output.latent,
+        tsne=rules.TSNE.output.out,
+        umap=rules.UMAP.output.out,
+    output:
+        out="vision/vision.rds"
+    script: "../../pipelineScripts/Vision/vision.R"
+
+###########################
+#   Transcriptomics       #
+###########################
+
+rule runHotspot_transcriptomics:
+    input:
+        loom=data(LOOM_FILE),
+        latent=rules.PCA.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+        use_umi=True,
+    output:
+        results="hotspot/hotspot_pca.txt"
+    script: "../../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspotPairs_transcriptomics:
+    input:
+        loom=data(LOOM_FILE),
+        latent=rules.PCA.output.latent,
+        hs_results=rules.runHotspot_transcriptomics.output.results,
+    params:
+        model='danb',
+        fdrThresh=.05,
+        topN=2000,
+        n_neighbors=30,
+        use_umi=True,
+    output:
+        results_lc="hotspot/hotspot_pairs_lc.txt.gz",
+        results_z="hotspot/hotspot_pairs_z.txt.gz"
+    script: "../../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules_transcriptomics:
+    input:
+        results_z=rules.runHotspotPairs_transcriptomics.output.results_z,
+    params:
+        min_cluster_genes=50,
+        core_only=True,
+        # z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="hotspot/module_heatmap.svg",
+        cluster_output="hotspot/modules.txt",
+        linkage_output="hotspot/linkage.txt",
+    script: "../../pipelineScripts/hotspot/extractHotspotModules.py"
+
+###########################
+#       Lineage           #
+###########################
+
+rule runHotspot_lineage:
+    input:
+        loom=data(LOOM_FILE),
+        cm_file=data(CM_FILE),
+    params:
+        model='danb',
+        n_neighbors=30,
+        use_umi=True,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_lineage.txt"
+    script: "../../pipelineScripts/hotspot/runHotspotLineage.py"
+
+rule runHotspot_lineage_tree:
+    input:
+        loom=data(LOOM_FILE),
+        tree_file=data(TREE_FILE),
+    params:
+        model='danb',
+        n_neighbors=30,
+        use_umi=True,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_lineage_tree.txt"
+    script: "../../pipelineScripts/hotspot/runHotspotLineageTree.py"
+
+rule runHotspotPairs_lineage:
+    input:
+        loom=data(LOOM_FILE),
+        cm_file=data(CM_FILE),
+        hs_results=rules.runHotspot_lineage.output.results,
+    params:
+        model='danb',
+        fdrThresh=.05,
+        n_neighbors=30,
+        use_umi=True,
+    output:
+        results_lc="hotspot/hotspot_pairs_lineage_lc.txt.gz",
+        results_z="hotspot/hotspot_pairs_lineage_z.txt.gz"
+    script: "../../pipelineScripts/hotspot/runHotspotPairsLineage.py"
+
+rule runHotspotPairs_lineage_tree:
+    input:
+        loom=data(LOOM_FILE),
+        tree_file=data(TREE_FILE),
+        hs_results=rules.runHotspot_lineage_tree.output.results,
+    params:
+        model='danb',
+        fdrThresh=.05,
+        n_neighbors=30,
+        use_umi=True,
+    output:
+        results_lc="hotspot/hotspot_pairs_lineage_tree_lc.txt.gz",
+        results_z="hotspot/hotspot_pairs_lineage_tree_z.txt.gz"
+    script: "../../pipelineScripts/hotspot/runHotspotPairsLineageTree.py"
+
+rule extractHotspotModules_lineage_tree:
+    input:
+        results_z=rules.runHotspotPairs_lineage_tree.output.results_z,
+    params:
+        min_cluster_genes=50,
+        core_only=True,
+        # z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="hotspot/module_heatmap_lineage_tree.svg",
+        cluster_output="hotspot/modules_lineage_tree.txt",
+        linkage_output="hotspot/linkage_lineage_tree.txt",
+    script: "../../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule extractHotspotModules_lineage:
+    input:
+        results_z=rules.runHotspotPairs_lineage.output.results_z,
+    params:
+        min_cluster_genes=30,
+        core_only=True,
+        # z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="hotspot/module_heatmap_lineage.svg",
+        cluster_output="hotspot/modules_lineage.txt",
+        linkage_output="hotspot/linkage_lineage.txt",
+    script: "../../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule shuffleLineage:
+    input:
+        positions=data(CM_FILE),
+    output:
+        positions="cluster_matrix/shuffled.txt"
+    script: "../../pipelineScripts/shufflePositions.py"
+
+rule shuffleTree:
+    input:
+        tree=data(TREE_FILE),
+    output:
+        tree="tree/shuffled.txt"
+    script: "shuffleTree.py"
+
+rule runHotspot_lineage_shuffled:
+    input:
+        loom=data(LOOM_FILE),
+        cm_file=rules.shuffleLineage.output.positions,
+    params:
+        model='danb',
+        n_neighbors=30,
+        use_umi=True,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_shuffled.txt"
+    script: "../../pipelineScripts/hotspot/runHotspotLineage.py"
+
+rule runHotspot_lineage_shuffled_tree:
+    input:
+        loom=data(LOOM_FILE),
+        tree_file=rules.shuffleTree.output.tree,
+    params:
+        model='danb',
+        n_neighbors=30,
+        use_umi=True,
+        n_cells_min=10,
+    output:
+        results="hotspot/hotspot_tree_shuffled.txt"
+    script: "../../pipelineScripts/hotspot/runHotspotLineageTree.py"
+
+rule computeModuleScores_lineage:
+    input:
+        loom=data(LOOM_FILE),
+        cm_file=data(CM_FILE),
+        modules=rules.extractHotspotModules_lineage.output.cluster_output,
+    params:
+        model='danb',
+        n_neighbors=30,
+    output:
+        scores="hotspot/module_scores_lineage.txt.gz",
+    script: "../../pipelineScripts/hotspot/computeModuleScores_lineage.py"
+
+rule computeModuleScores_lineage_tree:
+    input:
+        loom=data(LOOM_FILE),
+        tree_file=data(TREE_FILE),
+        modules=rules.extractHotspotModules_lineage_tree.output.cluster_output,
+    params:
+        model='danb',
+        n_neighbors=30,
+    output:
+        scores="hotspot/module_scores_lineage_tree.txt.gz",
+    script: "../../pipelineScripts/hotspot/computeModuleScores_tree.py"
+
+rule runHotspotPairsShuffled:
+    input:
+        loom=data(LOOM_FILE),
+        tree_file=data(TREE_FILE),
+        hs_results=rules.runHotspot_lineage_tree.output.results,
+    params:
+        model='danb',
+        n_neighbors=30,
+        use_umi=True,
+        fdrThresh=.05,
+    output:
+        results_lc="hotspot/hotspot_pairs_shuffled_lc.txt.gz",
+        results_z="hotspot/hotspot_pairs_shufled_z.txt.gz"
+    script: "../../pipelineScripts/hotspot/runHotspotPairs_shuffled_tree.py"
+
+
+
+###########################
+#         All             #
+###########################
+
+rule all:
+    input:
+        rules.select_genes.output,
+        rules.PCA.output,
+        rules.TSNE.output,
+        rules.UMAP.output,
+        rules.cluster_threshold.output,
+        rules.vision.output,
+        rules.runHotspot_transcriptomics.output,
+        rules.runHotspotPairs_transcriptomics.output,
+        rules.extractHotspotModules_transcriptomics.output,
+        rules.extractHotspotModules_lineage.output,
+        rules.runHotspot_lineage_shuffled.output,
+        rules.extractHotspotModules_lineage_tree.output,
+        rules.runHotspot_lineage_shuffled_tree.output,
+        rules.computeModuleScores_lineage_tree.output,
+        rules.runHotspotPairsShuffled.output,
