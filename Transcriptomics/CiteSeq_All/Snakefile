@@ -1,8 +1,0 @@
-subworkflow data:
-    workdir:
-        "../data/CiteSeq_PBMC"
-
-data_file = "data.loom"
-ab_file = "ab.txt.gz"
-
-include: "../latentTestsSnake/Snakefile"
