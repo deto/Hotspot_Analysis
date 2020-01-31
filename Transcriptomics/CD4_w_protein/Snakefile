@@ -9,7 +9,7 @@ include: "../latentTestsSnake/Snakefile"
 
 rule computeGRScores:
     input:
-        signatures="../../Signatures/TCells_noCD8.gmt"
+        signatures="../../data/Signatures/TCells_noCD8.gmt",
     output:
         out="evaluation/geneRelevanceScores.txt"
     script: "scripts/computeGeneRelevanceScores.py"
