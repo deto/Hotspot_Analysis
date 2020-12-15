@@ -1,0 +1,21 @@
+# Simulate gene expression based on a cell-cell proximity mapping
+
+rule sim_data:
+    input:
+        ref_loom="../10x_PBMC_w_proteins/cd4/data.loom",
+    output:
+        out_loom=protected("data.loom"),
+        out_pca="pca.txt",
+        out_tsne="tsne.txt",
+        out_components="components.txt",
+    script: "local_simulator.py"
+
+rule sim_data_one_rep:
+    input:
+        ref_loom="../10x_PBMC_w_proteins/cd4/data.loom",
+    output:
+        out_loom=protected("rep_{n}/data.loom"),
+        out_pca="rep_{n}/pca.txt",
+        out_tsne="rep_{n}/tsne.txt",
+        out_components="rep_{n}/components.txt",
+    script: "local_simulator.py"

@@ -1,0 +1,146 @@
+data_file_rep = "rep_{n}/data.loom"
+
+rule select_threshold_one_rep:
+    input:
+        loom=data(data_file_rep),
+    params:
+        N_CELLS=10,
+    output:
+        genes="rep_{n}/genes/threshold.txt"
+    script: "pipelineScripts/select_threshold.py"
+
+rule select_hvg_one_rep:
+    input:
+        loom=data(data_file_rep),
+    params:
+        lowXcutoff=0.1,
+        #highXMeanCutoff=20,
+    output:
+        genes="rep_{n}/genes/hvg.txt",
+        geneInfo="rep_{n}/genes/hvg_info.txt"
+    script: "pipelineScripts/select_hvg.R"
+
+rule select_danb_one_rep:
+    input:
+        loom=data(data_file_rep),
+    params:
+        #highXMeanCutoff=20,
+    output:
+        genes="rep_{n}/genes/danb.txt",
+        geneInfo="rep_{n}/genes/danb_info.txt"
+    script: "pipelineScripts/select_danb.R"
+
+rule PCA_threshold_one_rep:
+    message: "Computing PCA on thresholded genes"
+    input:
+        loom=data(data_file_rep),
+        genes=rules.select_threshold_one_rep.output.genes,
+    params:
+        doStandardize=True,
+        doJackstraw=False,
+        num_pcs=5,
+    output:
+        latent="rep_{n}/pca/pca_threshold.txt",
+        components="rep_{n}/pca/pca_components.txt",
+    script: "pipelineScripts/pca/pca_sim.py"
+
+rule select_pca_one_rep:
+    input:
+        components=rules.PCA_threshold_one_rep.output.components,
+    output:
+        genes="rep_{n}/genes/pca.txt",
+        geneInfo="rep_{n}/genes/pca_info.txt"
+    script: "pipelineScripts/select_pca.py"
+
+rule SCVI_one_rep:
+    message: "Computing SCVI on thresholded genes"
+    input:
+        loom=data(data_file_rep),
+        genes=rules.select_threshold_one_rep.output.genes,
+    params:
+        components=10,
+    output:
+        latent="rep_{n}/scvi/threshold/latent.txt.gz",
+        model="rep_{n}/scvi/threshold/model.pkl",
+    script: "pipelineScripts/scvi/scviTorch.py"
+
+rule TSNE_one_rep:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.SCVI_one_rep.output.latent,
+    output:
+        out="rep_{n}/tsne/tsne.txt",
+    script: "pipelineScripts/tsne/tsne.py"
+
+rule UMAP_one_rep:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI_one_rep.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="rep_{n}/umap/umap.txt",
+    script: "pipelineScripts/umap/umap.py"
+
+rule TSNE_pca_one_rep:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_threshold_one_rep.output.latent,
+    output:
+        out="rep_{n}/tsne/tsne_pca.txt",
+    script: "pipelineScripts/tsne/tsne.py"
+
+rule UMAP_pca_one_rep:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA_threshold_one_rep.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="rep_{n}/umap/umap_pca.txt",
+    script: "pipelineScripts/umap/umap.py"
+
+rule runHotspot_threshold_pca_one_rep:
+    input:
+        loom=data(data_file_rep),
+        latent=rules.PCA_threshold_one_rep.output.latent,
+    params:
+        model='danb',
+        n_neighbors=300,
+        n_cells_min=10,
+        weighted_graph=True,
+    output:
+        results="rep_{n}/hotspot/hotspot_pca_threshold.txt"
+    script: "pipelineScripts/hotspot/runHotspot.py"
+
+rule vision_one_rep:
+    input:
+        loom=data(data_file_rep),
+        latent=rules.SCVI_one_rep.output.latent,
+        proj_positions=rules.SCVI_one_rep.output.latent,
+        tsne=rules.TSNE_one_rep.output.out,
+        umap=rules.UMAP_one_rep.output.out,
+    output:
+        out="rep_{n}/vision/vision.rds"
+    script: "pipelineScripts/Vision/vision.R"
+
+rule vision_pca_one_rep:
+    input:
+        loom=data(data_file_rep),
+        latent=rules.PCA_threshold_one_rep.output.latent,
+        proj_positions=rules.PCA_threshold_one_rep.output.latent,
+        tsne=rules.TSNE_pca_one_rep.output.out,
+        umap=rules.UMAP_pca_one_rep.output.out,
+    output:
+        out="rep_{n}/vision/vision_pca.rds"
+    script: "pipelineScripts/Vision/vision.R"
+
+reps = [str(x+1) for x in range(10)]
+
+rule all_reps:
+    input:
+        expand(rules.runHotspot_threshold_pca_one_rep.output, n=reps),
+        expand(rules.select_hvg_one_rep.output, n=reps),
+        expand(rules.select_danb_one_rep.output, n=reps),
+        expand(rules.select_pca_one_rep.output, n=reps),
+        expand(rules.TSNE_pca_one_rep.output, n=reps),
