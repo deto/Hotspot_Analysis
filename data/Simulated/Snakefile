@@ -1,0 +1,16 @@
+rule simdata:
+    output:
+        cell_effects="rep{N}/cell_effects.txt",
+        cell_indices="rep{N}/cell_indices.txt",
+        gene_effects="rep{N}/gene_effects.txt",
+        gene_indices="rep{N}/gene_indices.txt",
+        true_counts="rep{N}/true_counts.txt.gz",
+        obs_counts="rep{N}/observed_counts.txt.gz",
+    script: "symulateCounts.R"
+
+rule makeLoom:
+    input:
+        obs="rep{N}/observed_counts.txt.gz",
+    output:
+        loom=protected("rep{N}/data.loom"),
+    script: "createLoom.py"

@@ -10,12 +10,6 @@ gene_indices_file <- snakemake@output[["gene_indices"]]
 true_counts_file <- snakemake@output[["true_counts"]]
 obs_counts_file <- snakemake@output[["obs_counts"]]
 
-if ("CELL_FACTOR" %in% names(snakemake@params)) {
-    CELL_FACTOR <- snakemake@params[["CELL_FACTOR"]]
-} else {
-    CELL_FACTOR <- 1
-}
-
 # Inside this file I've broken the SimulateTrueCounts function into three pieces
 # First piece is 'compute_evf_params': unchanged from main code
 #    This results in evf_res and gene_effects
@@ -124,7 +118,7 @@ trueCounts <- function(evf_res, gene_effects) {
 
 # %% Great - ok, now see if we can create multiple components
 
-ncells_total <- 3000 * CELL_FACTOR
+ncells_total <- 3000
 ngenes_total <- 5000
 nevf <- 1
 min_popsize = 200
@@ -170,7 +164,7 @@ new_effect_sd <- .1 * strength
 
 n_evfs_to_add <- 5
 n_genes_per_evf <- 100
-n_cells_per_evf <- 500 * CELL_FACTOR
+n_cells_per_evf <- 500
 
 gene_indices <- sample.int(
     ngenes_total,
@@ -195,12 +189,12 @@ new_evfs[[1]] <- rnorm(ncells_total)*.5
 mem_cells <- cell_indices[[1]][new_evfs[[1]] > 0]
 naive_cells <- cell_indices[[1]][new_evfs[[1]] < 0]
 
-cell_indices[[2]] <- sample(mem_cells, size=300*CELL_FACTOR)
+cell_indices[[2]] <- sample(mem_cells, size=300)
 new_evfs[[2]] <- rep(0, ncells_total)
 new_evfs[[2]][cell_indices[[2]]] <- rnorm(
     length(cell_indices[[2]]))*.5 + 1
 
-cell_indices[[3]] <- sample(mem_cells, size=30*CELL_FACTOR)
+cell_indices[[3]] <- sample(mem_cells, size=30)
 new_evfs[[3]] <- rep(0, ncells_total)
 new_evfs[[3]][cell_indices[[3]]] <- rnorm(
     length(cell_indices[[3]]))*.5 + 1
@@ -299,7 +293,7 @@ path <- system.file("data/gene_len_pool.RData", package = "SymSim")
 load(path)
 gene_len <- sample(gene_len_pool, ngenes_total, replace = FALSE)
 
-options(mc.cores=10)
+options(mc.cores=20)
 observed_counts_res <- True2ObservedCounts(
     true_counts = true_counts_res[[1]],
     meta_cell = true_counts_res[[3]],

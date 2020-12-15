@@ -1,0 +1,121 @@
+# This version differs from Simulated3 in that
+# we only vary the synthesis parameter and not
+# all three
+
+# Sequencing Depths
+#
+rule sim_true_counts:
+    output:
+        gene_effects="true_counts/gene_effects.txt",
+        true_counts="true_counts/true_counts.txt.gz",
+        cell_meta="true_counts/cell_meta.txt",
+    params:
+        strength=8
+    script: "symulateTrueCounts.R"
+
+
+rule sim_obs_counts:
+    input:
+        cell_meta=rules.sim_true_counts.output.cell_meta,
+        true_counts=rules.sim_true_counts.output.true_counts,
+    params:
+        seq_depth="{seq_depth}",
+    output:
+        obs_counts="obs_counts/{seq_depth}/obs_counts.txt.gz",
+    script: "downsampleCounts.R"
+
+
+rule makeLoom:
+    input:
+        obs=rules.sim_obs_counts.output.obs_counts,
+    output:
+        loom=protected("obs_counts/{seq_depth}/data.loom"),
+    script: "createLoom.py"
+
+
+seq_depths = ["1e3", "2e3", "5e3", "10e3", "20e3", "40e3", "80e3", "160e3", "320e3"]
+
+# Vary the alpha also
+
+rule sim_obs_counts_alpha:
+    input:
+        cell_meta=rules.sim_true_counts.output.cell_meta,
+        true_counts=rules.sim_true_counts.output.true_counts,
+    params:
+        seq_depth="5e4",
+        alpha_mean="{alpha_mean}",
+    output:
+        obs_counts="obs_counts_vary_alpha/alpha_{alpha_mean}/obs_counts.txt.gz",
+    script: "downsampleCounts.R"
+
+
+rule makeLoom_alpha:
+    input:
+        obs=rules.sim_obs_counts_alpha.output.obs_counts,
+    output:
+        loom=protected("obs_counts_vary_alpha/alpha_{alpha_mean}/data.loom"),
+    script: "createLoom.py"
+
+
+alpha_means = ["0.01", "0.02", "0.05", "0.10", "0.15", "0.2"]
+
+# Reps at a single depth
+
+rule sim_true_counts_rep:
+    output:
+        gene_effects="rep{N}/gene_effects.txt",
+        true_counts="rep{N}/true_counts.txt.gz",
+        cell_meta="rep{N}/cell_meta.txt",
+    params:
+        strength=8
+    script: "symulateTrueCounts.R"
+    
+rule sim_obs_counts_rep:
+    input:
+        cell_meta=rules.sim_true_counts_rep.output.cell_meta,
+        true_counts=rules.sim_true_counts_rep.output.true_counts,
+    params:
+        seq_depth="5e4",
+    output:
+        obs_counts="rep{N}/obs_counts.txt.gz",
+    script: "downsampleCounts.R"
+
+rule makeLoom_rep:
+    input:
+        obs=rules.sim_obs_counts_rep.output.obs_counts,
+    output:
+        loom=protected("rep{N}/data.loom"),
+    script: "createLoom.py"
+
+rule sim_true_counts_large:
+    output:
+        gene_effects="large_rep/gene_effects.txt",
+        true_counts="large_rep/true_counts.txt.gz",
+        cell_meta="large_rep/cell_meta.txt",
+    params:
+        strength=8,
+        CELL_FACTOR=10,
+    script: "symulateTrueCounts.R"
+
+rule sim_obs_counts_large:
+    input:
+        cell_meta=rules.sim_true_counts_large.output.cell_meta,
+        true_counts=rules.sim_true_counts_large.output.true_counts,
+    params:
+        seq_depth="5e4",
+    output:
+        obs_counts="large_rep/obs_counts.txt.gz",
+    script: "downsampleCounts.R"
+
+rule makeLoom_large:
+    input:
+        obs="large_rep/obs_counts.txt.gz",
+    output:
+        loom=protected("large_rep/data.loom"),
+    script: "createLoom.py"
+
+rule all:
+    input:
+        expand(rules.makeLoom.output.loom, seq_depth=seq_depths),
+        expand(rules.makeLoom_alpha.output.loom, alpha_mean=alpha_means),
+

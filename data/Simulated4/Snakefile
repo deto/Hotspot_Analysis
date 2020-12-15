@@ -38,3 +38,22 @@ rule makeLoom:
     output:
         loom=protected("rep{N}/data.loom"),
     script: "createLoom.py"
+
+rule simdata_large:
+    output:
+        cell_effects="large_rep/cell_effects.txt",
+        gene_effects="large_rep/gene_effects.txt",
+        gene_indices="large_rep/gene_indices.txt",
+        true_counts="large_rep/true_counts.txt.gz",
+        obs_counts="large_rep/observed_counts.txt.gz",
+    params:
+        strength=8,
+        CELL_FACTOR=10,
+    script: "symulateCounts.R"
+
+rule makeLoom_large:
+    input:
+        obs="large_rep/observed_counts.txt.gz",
+    output:
+        loom=protected("large_rep/data.loom"),
+    script: "createLoom.py"

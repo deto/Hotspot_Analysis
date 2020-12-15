@@ -5,16 +5,11 @@ library(ggplot2)
 library(pbmcapply)
 
 cell_effects_file <- snakemake@output[["cell_effects"]]
+cell_indices_file <- snakemake@output[["cell_indices"]]
 gene_effects_file <- snakemake@output[["gene_effects"]]
 gene_indices_file <- snakemake@output[["gene_indices"]]
 true_counts_file <- snakemake@output[["true_counts"]]
 obs_counts_file <- snakemake@output[["obs_counts"]]
-
-if ("CELL_FACTOR" %in% names(snakemake@params)) {
-    CELL_FACTOR <- snakemake@params[["CELL_FACTOR"]]
-} else {
-    CELL_FACTOR <- 1
-}
 
 # Inside this file I've broken the SimulateTrueCounts function into three pieces
 # First piece is 'compute_evf_params': unchanged from main code
@@ -124,7 +119,7 @@ trueCounts <- function(evf_res, gene_effects) {
 
 # %% Great - ok, now see if we can create multiple components
 
-ncells_total <- 3000 * CELL_FACTOR
+ncells_total <- 3000
 ngenes_total <- 5000
 nevf <- 1
 min_popsize = 200
@@ -139,6 +134,10 @@ geffect_mean_0 <- 0
 geffect_sd_0 <- 1  
 evf_center <- 1
 Sigma <- 0.5
+
+# Effect sizes for the new effects
+new_effect_mean <- 0
+new_effect_sd <- .8
 
 rr <- compute_evf_params(
         ncells_total,
@@ -156,21 +155,19 @@ evfs <- evf_res[[1]]
 meta <- evf_res[[2]]
 gene_effects <- rr[[2]]
 
+# We only want the synthesis rate to be affected
+# I 'think' that's the third one?
+
+
 # The first EVF should just be an offset term with random gene contributions
 for (p in seq(3)){
     gene_effects[[p]][, 1] <- rnorm(nrow(gene_effects[[p]]))*geffect_sd_0 + geffect_mean_0
     evfs[[p]][, 1] <- rep(1, nrow(evfs[[p]]))
 }
 
-# Effect sizes for the new effects
-new_effect_mean <- 0
-
-strength <- as.numeric(snakemake@params[["strength"]])
-new_effect_sd <- .1 * strength
-
 n_evfs_to_add <- 5
 n_genes_per_evf <- 100
-n_cells_per_evf <- 500 * CELL_FACTOR
+n_cells_per_evf <- 500
 
 gene_indices <- sample.int(
     ngenes_total,
@@ -179,50 +176,21 @@ gene_indices <- sample.int(
 )
 
 gene_indices <- matrix(gene_indices, ncol = n_evfs_to_add)
-# Add Components
-# 	- Component 1:  Stratifies cells in half
-# 	- Component 2:  Some effect of subset of memory cells
-# 	- Component 3: Some effect of different subset of memory cells (maybe a small subset?)
-#   - Component 4: Stratifies only the naïve cells in half
-#   - Component 5: Stratifies all cells in half again
-
-cell_indices <- list()
-new_evfs <- list()
-
-cell_indices[[1]] <- seq(ncells_total)
-new_evfs[[1]] <- rnorm(ncells_total)*.5
-
-mem_cells <- cell_indices[[1]][new_evfs[[1]] > 0]
-naive_cells <- cell_indices[[1]][new_evfs[[1]] < 0]
-
-cell_indices[[2]] <- sample(mem_cells, size=300*CELL_FACTOR)
-new_evfs[[2]] <- rep(0, ncells_total)
-new_evfs[[2]][cell_indices[[2]]] <- rnorm(
-    length(cell_indices[[2]]))*.5 + 1
-
-cell_indices[[3]] <- sample(mem_cells, size=30*CELL_FACTOR)
-new_evfs[[3]] <- rep(0, ncells_total)
-new_evfs[[3]][cell_indices[[3]]] <- rnorm(
-    length(cell_indices[[3]]))*.5 + 1
-
-cell_indices[[4]] <- naive_cells
-new_evfs[[4]] <- rep(0, ncells_total)
-new_evfs[[4]][cell_indices[[4]]] <- rnorm(
-    length(cell_indices[[4]]))*.5 + 1
-
-cell_indices[[5]] <- seq(ncells_total)
-new_evfs[[5]] <- rnorm(ncells_total)*.35
-
+cell_indices <- matrix(0, nrow=n_cells_per_evf, ncol=n_evfs_to_add)
+for (i in seq(ncol(cell_indices))){
+    cell_indices[, i] <- sample.int(ncells_total, size=n_cells_per_evf, replace=FALSE)
+}
 
 param_names <- c("kon", "koff", "s")
 
 for (i in seq(n_evfs_to_add)){
     evf_name <- paste0("new_evf", i)
     # Add the evf and initial gene_effect values
-    cells_i <- cell_indices[[i]]
+    cells_i <- cell_indices[, i]
     for (p in seq(3)){
         evf_name_p <- paste0(param_names[p], "_", evf_name)
-        new_vals <- new_evfs[[i]]
+        new_vals <- rep(0, ncells_total)
+        new_vals[cells_i] <- rnorm(length(cells_i))*.5 + evf_center
         evfs[[p]] <- cbind(evfs[[p]], new_vals)
         colnames(evfs[[p]])[ncol(evfs[[p]])] <- evf_name_p
         
@@ -233,20 +201,8 @@ for (i in seq(n_evfs_to_add)){
 
     # Add the gene effects
     genes_i <- gene_indices[, i]
-
-    # kon
-    # new_gvals <- rep(0, ngenes_total)
-    # new_gvals[genes_i] <- rnorm(length(genes_i)) * new_effect_sd + new_effect_mean
-    # gene_effects[[1]][, ncol(gene_effects[[1]])] <- new_gvals
-
-    # koff
-    # new_gvals <- rep(0, ngenes_total)
-    # new_gvals[genes_i] <- rnorm(length(genes_i)) * new_effect_sd + new_effect_mean
-    # gene_effects[[2]][, ncol(gene_effects[[2]])] <- new_gvals
-
-    # s
     new_gvals <- rep(0, ngenes_total)
-    new_gvals[genes_i] <- rnorm(length(genes_i)) * new_effect_sd + new_effect_mean
+    new_gvals[genes_i] <- rnorm(length(genes_i))*new_effect_sd + new_effect_mean
     gene_effects[[3]][, ncol(gene_effects[[3]])] <- new_gvals
 }
 
@@ -299,7 +255,7 @@ path <- system.file("data/gene_len_pool.RData", package = "SymSim")
 load(path)
 gene_len <- sample(gene_len_pool, ngenes_total, replace = FALSE)
 
-options(mc.cores=10)
+options(mc.cores=20)
 observed_counts_res <- True2ObservedCounts(
     true_counts = true_counts_res[[1]],
     meta_cell = true_counts_res[[3]],
@@ -356,6 +312,9 @@ write.table(true_counts_df, gzfile(true_counts_file), sep = "\t", col.names=NA)
 # Component indices
 gene_indices_df <- data.frame(gene_indices - 1) # -1 for 0-based
 write.table(gene_indices_df, gene_indices_file, sep = "\t", col.names=NA)
+
+cell_indices_df <- data.frame(cell_indices - 1) # -1 for 0-based
+write.table(cell_indices_df, cell_indices_file, sep = "\t", col.names=NA)
 
 # Component effects (for S)
 gene_effects_df <- data.frame(gene_effects[[3]])

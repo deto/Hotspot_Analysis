@@ -1,0 +1,39 @@
+# This version differs from Simulated3 in that
+# we only vary the synthesis parameter and not
+# all three
+
+rule sim_true_counts:
+    output:
+        gene_effects="true_counts/gene_effects.txt",
+        true_counts="true_counts/true_counts.txt.gz",
+        cell_meta="true_counts/cell_meta.txt",
+    params:
+        strength=8
+    script: "symulateTrueCounts.R"
+
+
+rule sim_obs_counts:
+    input:
+        cell_meta=rules.sim_true_counts.output.cell_meta,
+        true_counts=rules.sim_true_counts.output.true_counts,
+    params:
+        seq_depth="{seq_depth}",
+    output:
+        obs_counts="obs_counts/{seq_depth}/obs_counts.txt.gz",
+    script: "downsampleCounts.R"
+
+
+rule makeLoom:
+    input:
+        obs=rules.sim_obs_counts.output.obs_counts,
+    output:
+        loom=protected("obs_counts/{seq_depth}/data.loom"),
+    script: "createLoom.py"
+
+
+seq_depths = ["1e3", "2e3", "5e3", "10e3", "20e3", "40e3", "80e3", "160e3", "320e3"]
+
+rule all:
+    input:
+        expand(rules.makeLoom.output.loom, seq_depth=seq_depths)
+

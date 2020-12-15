@@ -8,13 +8,7 @@ cell_effects_file <- snakemake@output[["cell_effects"]]
 gene_effects_file <- snakemake@output[["gene_effects"]]
 gene_indices_file <- snakemake@output[["gene_indices"]]
 true_counts_file <- snakemake@output[["true_counts"]]
-obs_counts_file <- snakemake@output[["obs_counts"]]
-
-if ("CELL_FACTOR" %in% names(snakemake@params)) {
-    CELL_FACTOR <- snakemake@params[["CELL_FACTOR"]]
-} else {
-    CELL_FACTOR <- 1
-}
+cell_meta_file <- snakemake@output[["cell_meta"]]
 
 # Inside this file I've broken the SimulateTrueCounts function into three pieces
 # First piece is 'compute_evf_params': unchanged from main code
@@ -124,7 +118,7 @@ trueCounts <- function(evf_res, gene_effects) {
 
 # %% Great - ok, now see if we can create multiple components
 
-ncells_total <- 3000 * CELL_FACTOR
+ncells_total <- 3000
 ngenes_total <- 5000
 nevf <- 1
 min_popsize = 200
@@ -165,12 +159,12 @@ for (p in seq(3)){
 # Effect sizes for the new effects
 new_effect_mean <- 0
 
-strength <- as.numeric(snakemake@params[["strength"]])
+strength <- 8
 new_effect_sd <- .1 * strength
 
 n_evfs_to_add <- 5
 n_genes_per_evf <- 100
-n_cells_per_evf <- 500 * CELL_FACTOR
+n_cells_per_evf <- 500
 
 gene_indices <- sample.int(
     ngenes_total,
@@ -195,12 +189,12 @@ new_evfs[[1]] <- rnorm(ncells_total)*.5
 mem_cells <- cell_indices[[1]][new_evfs[[1]] > 0]
 naive_cells <- cell_indices[[1]][new_evfs[[1]] < 0]
 
-cell_indices[[2]] <- sample(mem_cells, size=300*CELL_FACTOR)
+cell_indices[[2]] <- sample(mem_cells, size=300)
 new_evfs[[2]] <- rep(0, ncells_total)
 new_evfs[[2]][cell_indices[[2]]] <- rnorm(
     length(cell_indices[[2]]))*.5 + 1
 
-cell_indices[[3]] <- sample(mem_cells, size=30*CELL_FACTOR)
+cell_indices[[3]] <- sample(mem_cells, size=30)
 new_evfs[[3]] <- rep(0, ncells_total)
 new_evfs[[3]][cell_indices[[3]]] <- rnorm(
     length(cell_indices[[3]]))*.5 + 1
@@ -259,91 +253,12 @@ true_counts <- true_counts_res[[1]]
 cell_meta <- true_counts_res[[3]]
 params <- true_counts_res[[4]]
 
-# scaled_counts <- t(t(true_counts) / colSums(true_counts) * 10000)
-# 
-# tsne_res <- Rtsne(t(log1p(scaled_counts)), dims = 2, initial_dims = 30)
-
-# ggplot() + aes(
-#     x=tsne_res$Y[, 1],
-#     y=tsne_res$Y[, 2],
-#     #color=cell_meta$s_new_evf3
-#     #color=evfs[[3]][, "s_new_evf1"]
-#     color=seq(ncells_total) %in% cell_indices[, 1]
-#     ) + geom_point()
-
-# %% Why are some components just bad??
-# Look at gene correlations
-
-# g1 <- gene_indices[, 1]
-# g11 <- g1[4]
-# 
-# gene_effects[[3]][g11, ]["s_new_evf1"]
-# 
-# plot(evfs[[3]][, "s_new_evf1"], scaled_counts[g11, ])
-# 
-# signal_genes <- log1p(scaled_counts)[as.numeric(gene_indices), ]
-# gene_correlations <- cor(t(signal_genes))
-# 
-# X11.options(type="Xlib")
-# 
-# library(RColorBrewer)
-# colors <- brewer.pal(11, name="RdBu")
-# breaks <- seq(-.2, .2, length.out=12)
-# heatmap(gene_correlations, Rowv=NA, Colv=NA, scale="none",
-#     col=colors, breaks=breaks)
 
 
-# What about the technical counts then
+# %% create output files
 
-path <- system.file("data/gene_len_pool.RData", package = "SymSim")
-load(path)
-gene_len <- sample(gene_len_pool, ngenes_total, replace = FALSE)
-
-options(mc.cores=10)
-observed_counts_res <- True2ObservedCounts(
-    true_counts = true_counts_res[[1]],
-    meta_cell = true_counts_res[[3]],
-    protocol = "UMI",
-    alpha_mean = 0.05, alpha_sd = 0.002, lenslope = 0.01,
-    nbins = 20, gene_len = gene_len,
-    amp_bias_limit = c(-0.3, 0.3), rate_2PCR = 0.7,
-    nPCR = 16, depth_mean = 5e4, depth_sd = 3e3
-)
-
-observed_counts <- observed_counts_res[[1]]
-observed_meta_cell <- observed_counts_res[[2]]
-nreads_perUMI <- observed_counts_res[[3]]
-nUMI2seq <- observed_counts_res[[4]]
-
-scaled_observed_counts <- t(t(observed_counts) / colSums(observed_counts) * 10000)
-
-# Plot
-
-# tsne_obs_res <- Rtsne(t(log1p(scaled_observed_counts)), dims = 2, initial_dims = 30)
-# 
-# ggplot() + aes(
-#     x=tsne_obs_res$Y[, 1],
-#     y=tsne_obs_res$Y[, 2],
-#     color=observed_meta_cell$s_new_evf1
-#     #color=colSums(observed_counts),
-#     ) + geom_point()
-
-
-# %% create output loom file
-
-gene_ids <- paste0("Gene", seq(nrow(observed_counts)))
-cell_ids <- paste0("Cell", seq(ncol(observed_counts)))
-
-# Loom files broken in R, make it in python instead...
-observed_counts_df <- data.frame(observed_counts)
-rownames(observed_counts_df) <- gene_ids
-colnames(observed_counts_df) <- cell_ids
-
-write.table(
-    observed_counts_df, gzfile(obs_counts_file),
-    sep = "\t", col.names=NA)
-
-# Other output files
+gene_ids <- paste0("Gene", seq(nrow(true_counts)))
+cell_ids <- paste0("Cell", seq(ncol(true_counts)))
 
 # True counts
 
@@ -366,3 +281,5 @@ cell_effects_df <- data.frame(evfs[[3]])
 rownames(cell_effects_df) <- cell_ids
 write.table(cell_effects_df, cell_effects_file, sep = "\t", col.names=NA)
 
+# cell meta -> need this to generate downsampled reads
+write.table(cell_meta, cell_meta_file, sep = "\t", row.names=FALSE)
