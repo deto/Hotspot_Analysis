@@ -9,7 +9,6 @@ loom_file = snakemake.input['loom']
 cm_file = snakemake.input['cm_file']  # Character-matrix file
 hs_results_file = snakemake.input['hs_results']
 
-out_file_lc = snakemake.output['results_lc']
 out_file_lcz = snakemake.output['results_z']
 
 model = snakemake.params['model']
@@ -103,7 +102,7 @@ dist_mat = pd.DataFrame(dist_mat, index=cm.index, columns=cm.index)
 
 # need counts, distances, and num_umi
 
-hs = hotspot.Hotspot(counts, distances=dist_mat, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, distances=dist_mat, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
@@ -124,7 +123,6 @@ else:
 
 hs_genes = hs_genes & counts.index
 
-lc, lcz = hs.compute_modules(hs_genes, model=model, centered=True, jobs=20)
+lcz = hs.compute_local_correlations(hs_genes, jobs=20)
 
-lc.to_csv(out_file_lc, sep="\t", compression="gzip")
 lcz.to_csv(out_file_lcz, sep="\t", compression="gzip")

@@ -3,37 +3,62 @@ from sklearn.metrics import roc_curve, precision_recall_curve
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from statsmodels.nonparametric.smoothers_lowess import lowess
 import seaborn as sns
 
 plt.rcParams['svg.fonttype'] = 'none'
 
-results_dir = "../../Simulation4"
-data_dir = "../../../data/Simulated4"
+results_dir = "../../Simulation6"
+data_dir = "../../../data/Simulated6"
+
+
+def get_module_indices(directory):
+    """
+    Returns the gene-module assignment mapping
+    """
+
+    try:
+
+        gene_indices = pd.read_table(
+            os.path.join(directory, "gene_indices.txt"), index_col=0
+        )
+        gene_indices.head()
+
+        def gene_index_to_gene_id(ix):
+            return "Gene{}".format(ix + 1)
+
+        module_indices = {
+            i + 1: gene_indices.iloc[:, i].map(gene_index_to_gene_id).values
+            for i in range(gene_indices.shape[1])
+        }
+
+        module_indices = {i: pd.Index(v) for i, v in module_indices.items()}
+
+    except OSError:
+
+        gene_effects = pd.read_table(
+            os.path.join(directory, "gene_effects.txt"), index_col=0
+        )
+
+        gene_effects = gene_effects.iloc[:, 1:]
+
+        module_indices = {}
+        for i in range(gene_effects.shape[1]):
+            vals = gene_effects.iloc[:, i]
+            module_indices[i+1] = vals[vals != 0].index
+
+    return module_indices
+
 
 def get_results_hs(rep):
 
     rep_dir = "rep{}/".format(rep)
 
     hs_results = pd.read_table(
-        os.path.join(results_dir, rep_dir, "hotspot/hotspot_pca_threshold.txt"),
+        os.path.join(results_dir, rep_dir, "hotspot/hotspot_threshold.txt"),
         index_col=0
     )
 
-    gene_indices = pd.read_table(
-        os.path.join(data_dir, rep_dir, "gene_indices.txt"), index_col=0
-    )
-    gene_indices.head()
-
-    def gene_index_to_gene_id(ix):
-        return "Gene{}".format(ix + 1)
-
-    module_indices = {
-        i + 1: gene_indices.iloc[:, i].map(gene_index_to_gene_id).values
-        for i in range(gene_indices.shape[1])
-    }
-
-    module_indices = {i: pd.Index(v) for i, v in module_indices.items()}
+    module_indices = get_module_indices(os.path.join(data_dir, rep_dir))
 
     all_module_indices = set()
     for x in module_indices.values():
@@ -92,20 +117,7 @@ def get_results_hvg(rep):
         index_col=0
     )
 
-    gene_indices = pd.read_table(
-        os.path.join(data_dir, rep_dir, "gene_indices.txt"), index_col=0
-    )
-    gene_indices.head()
-
-    def gene_index_to_gene_id(ix):
-        return "Gene{}".format(ix + 1)
-
-    module_indices = {
-        i + 1: gene_indices.iloc[:, i].map(gene_index_to_gene_id).values
-        for i in range(gene_indices.shape[1])
-    }
-
-    module_indices = {i: pd.Index(v) for i, v in module_indices.items()}
+    module_indices = get_module_indices(os.path.join(data_dir, rep_dir))
 
     all_module_indices = set()
     for x in module_indices.values():
@@ -143,20 +155,7 @@ def get_results_danb(rep):
         index_col=0
     )
 
-    gene_indices = pd.read_table(
-        os.path.join(data_dir, rep_dir, "gene_indices.txt"), index_col=0
-    )
-    gene_indices.head()
-
-    def gene_index_to_gene_id(ix):
-        return "Gene{}".format(ix + 1)
-
-    module_indices = {
-        i + 1: gene_indices.iloc[:, i].map(gene_index_to_gene_id).values
-        for i in range(gene_indices.shape[1])
-    }
-
-    module_indices = {i: pd.Index(v) for i, v in module_indices.items()}
+    module_indices = get_module_indices(os.path.join(data_dir, rep_dir))
 
     all_module_indices = set()
     for x in module_indices.values():
@@ -194,20 +193,7 @@ def get_results_pca(rep):
         index_col=0
     )
 
-    gene_indices = pd.read_table(
-        os.path.join(data_dir, rep_dir, "gene_indices.txt"), index_col=0
-    )
-    gene_indices.head()
-
-    def gene_index_to_gene_id(ix):
-        return "Gene{}".format(ix + 1)
-
-    module_indices = {
-        i + 1: gene_indices.iloc[:, i].map(gene_index_to_gene_id).values
-        for i in range(gene_indices.shape[1])
-    }
-
-    module_indices = {i: pd.Index(v) for i, v in module_indices.items()}
+    module_indices = get_module_indices(os.path.join(data_dir, rep_dir))
 
     all_module_indices = set()
     for x in module_indices.values():
@@ -315,6 +301,7 @@ def gather_results(reps, fxn):
 
     return out
 
+
 # %%
 
 reps = [x+1 for x in range(10)]
@@ -325,16 +312,13 @@ res_pca = gather_results(reps, get_results_pca)
 
 # %% AUC plots
 
-# Smooth the sd a little
 plt.figure()
 
 fpr = res_hs['fpr']
 mean = res_hs['tpr_means']
 maxs = res_hs['tpr_maxs']
 mins = res_hs['tpr_mins']
-sd = res_hs['tpr_sds']
 
-sd_s = lowess(sd, fpr, is_sorted=True, frac=0.1, return_sorted=False)
 
 plt.plot(fpr, mean, "-", label='HS')
 plt.fill_between(fpr, mins, maxs, color="gray", alpha=0.2)
@@ -343,9 +327,7 @@ fpr = res_hvg['fpr']
 mean = res_hvg['tpr_means']
 maxs = res_hvg['tpr_maxs']
 mins = res_hvg['tpr_mins']
-sd = res_hvg['tpr_sds']
 
-sd_s = lowess(sd, fpr, is_sorted=True, frac=0.1, return_sorted=False)
 
 plt.plot(fpr, mean, "-", label='Hvg')
 plt.fill_between(fpr, mins, maxs, color="gray", alpha=0.2)
@@ -354,9 +336,7 @@ fpr = res_danb['fpr']
 mean = res_danb['tpr_means']
 maxs = res_danb['tpr_maxs']
 mins = res_danb['tpr_mins']
-sd = res_danb['tpr_sds']
 
-sd_s = lowess(sd, fpr, is_sorted=True, frac=0.1, return_sorted=False)
 
 plt.plot(fpr, mean, "-", label='DANB')
 plt.fill_between(fpr, mins, maxs, color="gray", alpha=0.2)
@@ -365,9 +345,7 @@ fpr = res_pca['fpr']
 mean = res_pca['tpr_means']
 maxs = res_pca['tpr_maxs']
 mins = res_pca['tpr_mins']
-sd = res_pca['tpr_sds']
 
-sd_s = lowess(sd, fpr, is_sorted=True, frac=0.1, return_sorted=False)
 
 plt.plot(fpr, mean, "-", label='PCA')
 plt.fill_between(fpr, mins, maxs, color="gray", alpha=0.2)
@@ -381,7 +359,6 @@ plt.savefig('AUC.svg')
 
 # %% PR plots
 
-# Smooth the sd a little
 plt.figure()
 
 colors = sns.color_palette('deep')
@@ -393,11 +370,6 @@ maxs = res_hs['pre_maxs']
 
 plt.plot(recall, mean, "-", label='Hotspot', color=colors[0])
 plt.fill_between(recall, mins, maxs, color="gray", alpha=0.2, linewidth=0)
-
-plt.plot(
-    res_hs['point_recall'], res_hs['point_precision'],
-    'x', ms=3, color=colors[0]
-)
 
 recall = res_hvg['recall']
 mean = res_hvg['pre_means']

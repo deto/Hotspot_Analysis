@@ -36,12 +36,12 @@ counts = counts.loc[:, latent.index]
 num_umi = num_umi[latent.index]
 
 # need counts, latent, and num_umi
-hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, latent=latent, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
 )
 
-results = hs.compute_hotspot(model=model, jobs=5, centered=True)
+results = hs.compute_hotspot(jobs=5)
 
 results.to_csv(out_file, sep="\t")

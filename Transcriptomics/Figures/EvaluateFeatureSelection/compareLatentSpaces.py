@@ -30,10 +30,14 @@ data = {
 }
 
 # %% Load Protein Data
-proteins = pd.read_table("../../../data/10x_PBMC_w_proteins/cd4/ab.txt.gz", index_col=0)
-
 proteins_all = pd.read_table("../../../data/10x_PBMC_w_proteins/ab.txt.gz", index_col=0)
 proteins_all = np.log2(proteins_all + 1)
+
+proteins_cd4 = pd.read_table("../../../data/10x_PBMC_w_proteins/cd4/ab.txt.gz", index_col=0)
+proteins_cd4_norm = proteins_cd4.divide(proteins_cd4.sum(axis=1), axis=0)*10000
+
+cd4_95p = pd.Series(np.percentile(proteins_cd4_norm, 95, axis=0), index=proteins_cd4.columns, name='CD4_95p')
+
 
 
 # Looking at correlations between proteins and total protein per cell
@@ -66,7 +70,7 @@ for p in proteins_all.columns:
 
 
 
-    X2 = proteins_all.loc[proteins.index][p].values.reshape((-1, 1))
+    X2 = proteins_all.loc[proteins_all.index][p].values.reshape((-1, 1))
     pred = model.predict(X2)
     if model.means_[1, 0] < model.means_[0, 0]:
         pred = 1 - pred
@@ -90,7 +94,11 @@ res['pactive2'] = res['pactive']
 res.loc[res.dm < 2, 'pactive2'] = 0
 res = res.sort_values('pactive2')
 
-valid = res.index[res.pactive2 > .01]
+res['valid'] = res.pactive2 > .01
+valid = res.index[res.valid]
+
+#  Instead, use a simpler approach to threshold the proteins (reviewer request)
+valid = cd4_95p.index[cd4_95p > 100]
 
 
 # %% Transform data
@@ -109,9 +117,7 @@ data_df = pd.concat(
 # data_df = data_df.drop(['CD14', 'IgG2a', 'IgG2b', 'IgG1'], axis=0)
 
 # Just keep specific proteins
-protein_mean = proteins.mean(axis=0)
 data_df = data_df.loc[
-    #protein_mean.index[protein_mean > 10]
     valid
 ]
 
@@ -151,7 +157,7 @@ plt.savefig('deltaZ.svg')
 
 # %% Compare significance
 
-from scipy.stats import ranksums
+from scipy.stats import ranksums, ttest_ind, wilcoxon
 
 
 for mm1 in data_df.Method.unique():
@@ -168,5 +174,7 @@ for mm1 in data_df.Method.unique():
             .loc[valid] \
             .DeltaZ
 
-        test_result = ranksums(rh.values, rx.values)
+        #test_result = ttest_ind(rh.values, rx.values)
+        #test_result = ranksums(rh.values, rx.values)
+        test_result = wilcoxon(rh.values, rx.values)
         print('{} vs {}'.format(mm1, mm2), ':', test_result.statistic, test_result.pvalue)

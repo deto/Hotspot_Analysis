@@ -1,0 +1,11 @@
+subworkflow data:
+    workdir:
+        "../../data/10x_PBMC_w_proteins"
+
+data_file = "mono/data.loom"
+data_file_train = "mono/data_train.loom"
+data_file_test = "mono/data_test.loom"
+ab_file = "mono/ab.txt.gz"
+
+include: "../latentTestsSnake/Snakefile"
+include: "../Snakefile_splits"

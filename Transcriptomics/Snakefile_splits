@@ -1,0 +1,441 @@
+"""
+Hotspot and WGCNA are run on two splits of the CD4 Data
+In choosing the set of genes, we evaluate on the top 1000 HS-selected genes
+And also the top 1000 HVG-selected genes
+"""
+
+
+#########################
+#Train split of the data#
+#########################
+
+rule SCVI_train:
+    input:
+        loom=data(data_file),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        components=10,
+    output:
+        latent="train/scvi/latent.txt.gz",
+        model="train/scvi/model.pkl",
+    script: "../pipelineScripts/scvi/scviTorch.py"
+
+rule runHotspot_train:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_train.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="train/hotspot/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+rule select_hs_train_topN:
+    input:
+        geneInfo=rules.runHotspot_train.output.results,
+    params:
+        N=1000,
+        var="Z",
+        ascending=False,
+    output:
+        genes="train/hs_topN.txt"
+    script: "../pipelineScripts/select_topN.py"
+
+
+# Run on the HVG genes
+rule runHotspotPairs_train:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_train.output.latent,
+        hs_results=rules.runHotspot_train.output.results,
+        genes=rules.select_hvg_topN.output.genes,  # So that all running on same gene set
+    params:
+        model='danb',
+        fdrThresh=0.01,
+        topN=500,
+        n_neighbors=30,
+        highXMeanCutoff=20,
+    output:
+        results_z="train/hotspot/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules_train:
+    input:
+        results_z=rules.runHotspotPairs_train.output.results_z,
+    params:
+        min_cluster_genes=15,
+        core_only=True,
+        #z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="train/hotspot/module_heatmap.svg",
+        cluster_output="train/hotspot/modules.txt",
+        linkage_output="train/hotspot/linkage.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule runWGCNA_train:
+    input:
+        loom=data(data_file_train),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        power="auto",
+        min_module_size=15,
+    output:
+        cluster_output="train/wgcna/modules.txt",
+        scores="train/wgcna/module_scores.txt",
+    script: "../pipelineScripts/wgcna/wgcna.R"
+
+rule runICA5_train:
+    input:
+        loom=data(data_file_train),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        n_components=5,
+    output:
+        components="train/ica5/components.txt"
+    script: "../pipelineScripts/ICA/run_ica.py"
+
+rule runICA5_fdr_train:
+    input:
+        components=rules.runICA5_train.output.components,
+    params:
+        qvalcutoff=1e-3,
+    output:
+        components_fdr="train/ica5/components_fdr.txt",
+        modules="train/ica5/modules.txt",
+    script: "../pipelineScripts/ICA/run_ica_fdr.R"
+
+rule runICA8_train:
+    input:
+        loom=data(data_file_train),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        n_components=8,
+    output:
+        components="train/ica8/components.txt"
+    script: "../pipelineScripts/ICA/run_ica.py"
+
+rule runICA8_fdr_train:
+    input:
+        components=rules.runICA8_train.output.components,
+    params:
+        qvalcutoff=1e-3,
+    output:
+        components_fdr="train/ica8/components_fdr.txt",
+        modules="train/ica8/modules.txt",
+    script: "../pipelineScripts/ICA/run_ica_fdr.R"
+
+rule runICA10_train:
+    input:
+        loom=data(data_file_train),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        n_components=10,
+    output:
+        components="train/ica10/components.txt"
+    script: "../pipelineScripts/ICA/run_ica.py"
+
+rule runICA10_fdr_train:
+    input:
+        components=rules.runICA10_train.output.components,
+    params:
+        qvalcutoff=1e-3,
+    output:
+        components_fdr="train/ica10/components_fdr.txt",
+        modules="train/ica10/modules.txt",
+    script: "../pipelineScripts/ICA/run_ica_fdr.R"
+
+rule runGrnboost_train:
+    input:
+        loom=data(data_file_train),
+        genes=rules.select_hvg_topN.output.genes,
+    output:
+        pair_scores="train/grnboost/importance_scores.txt.gz",
+    shell: 
+        """
+        python ../../pipelineScripts/grnboost2/grnboost2.py \
+            `readlink -f {input.loom}` \
+            `readlink -f {input.genes}` \
+            `readlink -f {output.pair_scores}`
+        """
+
+rule extractModules_Grnboost_train:
+    input:
+        results_z=rules.runGrnboost_train.output.pair_scores,
+    params:
+        min_cluster_genes=15,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="train/grnboost/module_heatmap.svg",
+        cluster_output="train/grnboost/modules.txt",
+        linkage_output="train/grnboost/linkage.txt",
+    script: "../pipelineScripts/grnboost2/extractModules.py"
+
+# Run on the HS genes
+rule runHotspotPairs_train_hs:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_train.output.latent,
+        hs_results=rules.runHotspot_train.output.results,
+        genes=rules.select_hs_train_topN.output.genes,
+    params:
+        model='danb',
+        fdrThresh=0.01,
+        topN=500,
+        n_neighbors=30,
+        highXMeanCutoff=20,
+    output:
+        results_z="train/hotspot_hs/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules_train_hs:
+    input:
+        results_z=rules.runHotspotPairs_train_hs.output.results_z,
+    params:
+        min_cluster_genes=15,
+        core_only=True,
+        #z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="train/hotspot_hs/module_heatmap.svg",
+        cluster_output="train/hotspot_hs/modules.txt",
+        linkage_output="train/hotspot_hs/linkage.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule runWGCNA_train_hs:
+    input:
+        loom=data(data_file_train),
+        genes=rules.select_hs_train_topN.output.genes,
+    params:
+        power="auto",
+        min_module_size=15,
+    output:
+        cluster_output="train/wgcna_hs/modules.txt",
+        scores="train/wgcna_hs/module_scores.txt",
+    script: "../pipelineScripts/wgcna/wgcna.R"
+
+
+
+########################
+#Test split of the data#
+########################
+
+rule SCVI_test:
+    input:
+        loom=data(data_file),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        components=10,
+    output:
+        latent="test/scvi/latent.txt.gz",
+        model="test/scvi/model.pkl",
+    script: "../pipelineScripts/scvi/scviTorch.py"
+
+rule runHotspot_test:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_test.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="test/hotspot/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+# Run on HVG Genes
+
+rule runHotspotPairs_test:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_test.output.latent,
+        hs_results=rules.runHotspot_test.output.results,
+        genes=rules.select_hvg_topN.output.genes,  # So that all running on same gene set
+    params:
+        model='danb',
+        fdrThresh=0.01,
+        topN=500,
+        n_neighbors=30,
+        highXMeanCutoff=20,
+    output:
+        results_z="test/hotspot/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules_test:
+    input:
+        results_z=rules.runHotspotPairs_test.output.results_z,
+    params:
+        min_cluster_genes=15,
+        core_only=True,
+        #z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="test/hotspot/module_heatmap.svg",
+        cluster_output="test/hotspot/modules.txt",
+        linkage_output="test/hotspot/linkage.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule runWGCNA_test:
+    input:
+        loom=data(data_file_test),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        power="auto",
+        min_module_size=15,
+    output:
+        cluster_output="test/wgcna/modules.txt",
+        scores="test/wgcna/module_scores.txt",
+    script: "../pipelineScripts/wgcna/wgcna.R"
+
+rule runICA5_test:
+    input:
+        loom=data(data_file_test),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        n_components=5,
+    output:
+        components="test/ica5/components.txt"
+    script: "../pipelineScripts/ICA/run_ica.py"
+
+rule runICA5_fdr_test:
+    input:
+        components=rules.runICA5_test.output.components,
+    params:
+        qvalcutoff=1e-3,
+    output:
+        components_fdr="test/ica5/components_fdr.txt",
+        modules="test/ica5/modules.txt",
+    script: "../pipelineScripts/ICA/run_ica_fdr.R"
+
+rule runICA8_test:
+    input:
+        loom=data(data_file_test),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        n_components=8,
+    output:
+        components="test/ica8/components.txt"
+    script: "../pipelineScripts/ICA/run_ica.py"
+
+rule runICA8_fdr_test:
+    input:
+        components=rules.runICA8_test.output.components,
+    params:
+        qvalcutoff=1e-3,
+    output:
+        components_fdr="test/ica8/components_fdr.txt",
+        modules="test/ica8/modules.txt",
+    script: "../pipelineScripts/ICA/run_ica_fdr.R"
+
+rule runICA10_test:
+    input:
+        loom=data(data_file_test),
+        genes=rules.select_hvg_topN.output.genes,
+    params:
+        n_components=10,
+    output:
+        components="test/ica10/components.txt"
+    script: "../pipelineScripts/ICA/run_ica.py"
+
+rule runICA10_fdr_test:
+    input:
+        components=rules.runICA10_test.output.components,
+    params:
+        qvalcutoff=1e-3,
+    output:
+        components_fdr="test/ica10/components_fdr.txt",
+        modules="test/ica10/modules.txt",
+    script: "../pipelineScripts/ICA/run_ica_fdr.R"
+
+rule runGrnboost_test:
+    input:
+        loom=data(data_file_test),
+        genes=rules.select_hvg_topN.output.genes,
+    output:
+        pair_scores="test/grnboost/importance_scores.txt.gz",
+    shell: 
+        """
+        python ../../pipelineScripts/grnboost2/grnboost2.py \
+            `readlink -f {input.loom}` \
+            `readlink -f {input.genes}` \
+            `readlink -f {output.pair_scores}`
+        """
+
+rule extractModules_Grnboost_test:
+    input:
+        results_z=rules.runGrnboost_test.output.pair_scores,
+    params:
+        min_cluster_genes=15,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="test/grnboost/module_heatmap.svg",
+        cluster_output="test/grnboost/modules.txt",
+        linkage_output="test/grnboost/linkage.txt",
+    script: "../pipelineScripts/grnboost2/extractModules.py"
+
+
+# Run on the HS genes
+
+rule runHotspotPairs_test_hs:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_test.output.latent,
+        hs_results=rules.runHotspot_test.output.results,
+        genes=rules.select_hs_train_topN.output.genes,  # So that all running on same gene set
+    params:
+        model='danb',
+        fdrThresh=0.01,
+        topN=500,
+        n_neighbors=30,
+        highXMeanCutoff=20,
+    output:
+        results_z="test/hotspot_hs/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules_test_hs:
+    input:
+        results_z=rules.runHotspotPairs_test_hs.output.results_z,
+    params:
+        min_cluster_genes=15,
+        core_only=True,
+        #z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="test/hotspot_hs/module_heatmap.svg",
+        cluster_output="test/hotspot_hs/modules.txt",
+        linkage_output="test/hotspot_hs/linkage.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+rule runWGCNA_test_hs:
+    input:
+        loom=data(data_file_test),
+        genes=rules.select_hs_train_topN.output.genes,  # So that all running on same gene set
+    params:
+        power="auto",
+        min_module_size=15,
+    output:
+        cluster_output="test/wgcna_hs/modules.txt",
+        scores="test/wgcna_hs/module_scores.txt",
+    script: "../pipelineScripts/wgcna/wgcna.R"
+
+
+rule all_splits:
+    input:
+        rules.extractHotspotModules_train.output,
+        rules.extractHotspotModules_test.output,
+        rules.runWGCNA_train.output,
+        rules.runWGCNA_test.output,
+        rules.runICA5_fdr_train.output,
+        rules.runICA5_fdr_test.output,
+        rules.runICA8_fdr_train.output,
+        rules.runICA8_fdr_test.output,
+        rules.runICA10_fdr_train.output,
+        rules.runICA10_fdr_test.output,
+        rules.extractHotspotModules_train_hs.output,
+        rules.extractHotspotModules_test_hs.output,
+        rules.runWGCNA_train_hs.output,
+        rules.runWGCNA_test_hs.output,
+        rules.extractModules_Grnboost_train.output,
+        rules.extractModules_Grnboost_test.output,

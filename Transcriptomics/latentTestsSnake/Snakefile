@@ -18,7 +18,6 @@ rule runHotspotPairs:
         n_neighbors=30,
         highXMeanCutoff=20,
     output:
-        results_lc="hotspot/hotspot_pairs_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "pipelineScripts/hotspot/runHotspotPairs.py"
 

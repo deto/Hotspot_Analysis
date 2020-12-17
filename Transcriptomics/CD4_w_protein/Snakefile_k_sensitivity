@@ -1,0 +1,17 @@
+rule runHotspot_k_sensitivity:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_hvg.output.latent,
+    params:
+        model='danb',
+        n_neighbors='{k}',
+        n_cells_min=10,
+    output:
+        results="k_sensitivity/k_{k}/hotspot.txt"
+    script: "../../pipelineScripts/hotspot/runHotspot.py"
+
+k_values = [5, 10, 30, 50, 100, 300, 500, 1000]
+
+rule runHotspot_k_sensitivity_all:
+    input:
+        expand(rules.runHotspot_k_sensitivity.output.results, k=k_values)

@@ -8,7 +8,6 @@ loom_file = snakemake.input['loom']
 tree_file = snakemake.input['tree_file']
 hs_results_file = snakemake.input['hs_results']
 
-out_file_lc = snakemake.output['results_lc']
 out_file_lcz = snakemake.output['results_z']
 
 model = snakemake.params['model']
@@ -63,7 +62,7 @@ num_umi = num_umi[valid_cells]
 # need counts, distances, and num_umi
 
 latent = pd.DataFrame(0, index=counts.columns, columns=range(10))
-hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, latent=latent, umi_counts=num_umi)
 
 neighbors, weights = hotspot.knn.tree_neighbors_and_weights(
     t, n_neighbors, counts)
@@ -92,7 +91,6 @@ else:
 
 hs_genes = hs_genes & counts.index
 
-lc, lcz = hs.compute_modules(hs_genes, model=model, centered=True, jobs=20)
+lcz = hs.compute_local_correlations(hs_genes, jobs=20)
 
-lc.to_csv(out_file_lc, sep="\t", compression="gzip")
 lcz.to_csv(out_file_lcz, sep="\t", compression="gzip")

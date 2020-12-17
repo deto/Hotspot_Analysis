@@ -1,0 +1,195 @@
+"""
+This is used for the downsampling tests when comparing Hotspot vs. Pearson's correlation
+This defines common rules
+Files importing this will need to define:
+
+subworkflow data
+data_file
+data_file_test
+"""
+
+rule select_threshold:
+    input:
+        loom=data(data_file),
+    params:
+        N_CELLS=10,
+    output:
+        genes="{rate}/genes/threshold.txt"
+    script: "../pipelineScripts/select_threshold.py"
+
+rule select_hvg:
+    input:
+        loom=data(data_file),
+    params:
+        lowXcutoff=0.1,
+        #highXMeanCutoff=20,
+    output:
+        genes="{rate}/genes/hvg.txt",
+        geneInfo="{rate}/genes/hvg_info.txt"
+    script: "../pipelineScripts/select_hvg.R"
+
+rule PCA_threshold:
+    message: "Computing PCA on thresholded genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_threshold.output.genes,
+    params:
+        doStandardize=True,
+        doJackstraw=False,
+        num_pcs=5,
+    output:
+        latent="{rate}/pca/pca_threshold.txt",
+        components="{rate}/pca/pca_components.txt",
+    script: "../pipelineScripts/pca/pca_sim.py"
+
+rule SCVI:
+    message: "Computing SCVI on thresholded genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_threshold.output.genes,
+    params:
+        components=10,
+    output:
+        latent="{rate}/scvi/threshold/latent.txt.gz",
+        model="{rate}/scvi/threshold/model.pkl",
+    script: "../pipelineScripts/scvi/scviTorch.py"
+
+rule TSNE:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.SCVI.output.latent,
+    output:
+        out="{rate}/tsne/tsne.txt",
+    script: "../pipelineScripts/tsne/tsne.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="{rate}/umap/umap.txt",
+    script: "../pipelineScripts/umap/umap.py"
+
+rule TSNE_pca:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    output:
+        out="{rate}/tsne/tsne_pca.txt",
+    script: "../pipelineScripts/tsne/tsne.py"
+
+rule UMAP_pca:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="{rate}/umap/umap_pca.txt",
+    script: "../pipelineScripts/umap/umap.py"
+
+rule runHotspot_threshold:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="{rate}/hotspot/hotspot_threshold.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspotPairs:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI.output.latent,
+        hs_results=rules.runHotspot_threshold.output.results,
+        genes=rules.select_hvg.output.genes.format(rate="100"),
+    params:
+        model='danb',
+        fdrThresh=0.05,
+        # topN=500,
+        n_neighbors=30,
+        # highXMeanCutoff=20,
+    output:
+        results_z="{rate}/hotspot/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule runRegularPairs:
+    input:
+        loom=data(data_file),
+        hs_results=rules.runHotspot_threshold.output.results,
+        genes=rules.select_hvg.output.genes.format(rate="100"),
+    params:
+        model='danb',
+        fdrThresh=0.05,
+        # topN=500,
+        n_neighbors=30,
+        # highXMeanCutoff=20,
+    output:
+        results_lc="{rate}/hotspot/regular_pairs_lc.txt.gz",
+    script: "../pipelineScripts/hotspot/runRegularPairs.py"
+
+rule runRegularPairs_test:
+    input:
+        loom=data(data_file_test),
+        hs_results=rules.runHotspot_threshold.output.results.format(rate="100"),  # This isn't used - gets overridden by the 'genes' input
+        genes=rules.select_hvg.output.genes.format(rate="100"),
+    params:
+        model='danb',
+        fdrThresh=0.05,
+        # topN=500,
+        n_neighbors=30,
+        # highXMeanCutoff=20,
+    output:
+        results_lc="test_data/hotspot/regular_pairs_lc.txt.gz",
+    script: "../pipelineScripts/hotspot/runRegularPairs.py"
+
+rule extractHotspotModules:
+    input:
+        results_z=rules.runHotspotPairs.output.results_z,
+    params:
+        min_cluster_genes=15,
+        core_only=False,
+        # z_threshold=1.96,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="{rate}/hotspot/module_heatmap.svg",
+        cluster_output="{rate}/hotspot/modules.txt",
+        linkage_output="{rate}/hotspot/linkage.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"
+
+
+rule extractRegularModules:
+    input:
+        results_z=rules.runRegularPairs.output.results_lc,
+        latent=rules.SCVI.output.latent,
+    params:
+        min_cluster_genes=15,
+        core_only=False,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="{rate}/hotspot/module_heatmap_regular.svg",
+        cluster_output="{rate}/hotspot/modules_regular.txt",
+        linkage_output="{rate}/hotspot/linkage_regular.txt",
+    script: "../pipelineScripts/hotspot/extractRegularModules.py"
+
+
+
+rates = ["100", "80", "60", "40", "20", "10", "5"]
+
+rule all:
+    input:
+        expand(rules.UMAP.output.out, rate=rates),
+        expand(rules.TSNE.output.out, rate=rates),
+        expand(rules.runHotspotPairs.output, rate=rates),
+        expand(rules.runRegularPairs.output, rate=rates),
+        expand(rules.extractHotspotModules.output, rate=rates),
+        expand(rules.extractRegularModules.output, rate=rates),
+        expand(rules.select_hvg.output, rate=rates),
+        expand(rules.TSNE_pca.output, rate=rates),
+        expand(rules.UMAP_pca.output, rate=rates),
+        rules.runRegularPairs_test.output,

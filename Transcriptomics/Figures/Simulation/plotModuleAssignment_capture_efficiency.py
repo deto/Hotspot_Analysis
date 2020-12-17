@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import os
+from natsort import natsorted
 
 plt.rcParams['svg.fonttype'] = 'none'
 
@@ -12,12 +13,11 @@ plt.rcParams['svg.fonttype'] = 'none'
 # data_dir = "../../../data/Simulated4"
 # results_dir = "../../Simulation4"
 
-data_dir = "../../../data/Simulated6"
-results_dir = "../../Simulation6"
+# data_dir = "../../../data/Simulated6"
+# results_dir = "../../Simulation6_capture_efficiency"
 
-# data_dir = "../../../data/Simulated_Tree_Continuous"
-# results_dir = "../../Simulation_Tree_Continuous"
-
+data_dir = "../../../data/Simulated_Tree_Continuous"
+results_dir = "../../Simulation_Tree_Continuous_capture_efficiency"
 
 def compute_stats(all_genes):
 
@@ -56,64 +56,41 @@ def compute_stats(all_genes):
     return precision, recall, accuracy
 
 
-def get_module_indices(directory):
+def get_module_indices(gene_effects):
     """
     Returns the gene-module assignment mapping
     """
 
-    try:
+    gene_effects = gene_effects.iloc[:, 1:]
 
-        gene_indices = pd.read_table(
-            os.path.join(directory, "gene_indices.txt"), index_col=0
-        )
-        gene_indices.head()
-
-        def gene_index_to_gene_id(ix):
-            return "Gene{}".format(ix + 1)
-
-        module_indices = {
-            i + 1: gene_indices.iloc[:, i].map(gene_index_to_gene_id).values
-            for i in range(gene_indices.shape[1])
-        }
-
-        module_indices = {i: pd.Index(v) for i, v in module_indices.items()}
-
-    except OSError:
-
-        gene_effects = pd.read_table(
-            os.path.join(directory, "gene_effects.txt"), index_col=0
-        )
-
-        gene_effects = gene_effects.iloc[:, 1:]
-
-        module_indices = {}
-        for i in range(gene_effects.shape[1]):
-            vals = gene_effects.iloc[:, i]
-            module_indices[i+1] = vals[vals != 0].index
+    module_indices = {}
+    for i in range(gene_effects.shape[1]):
+        vals = gene_effects.iloc[:, i]
+        module_indices[i+1] = vals[vals != 0].index
 
     return module_indices
 
+
+gene_effects = pd.read_table(
+    os.path.join(data_dir, "true_counts", "gene_effects.txt"), index_col=0
+)
+
+module_indices = get_module_indices(gene_effects)
 
 # True Data Load data
 def compute_results(rep, which):
     print(rep, which)
 
-    rep_dir = "rep{}".format(rep)
-
-    gene_effects = pd.read_table(
-        os.path.join(data_dir, rep_dir, "gene_effects.txt"), index_col=0
-    )
+    rep_dir = "alpha_{}".format(rep)
 
     try:
         gene_means = pd.read_table(
-            os.path.join(data_dir, rep_dir, "observed_counts.txt.gz"), index_col=0
+            os.path.join(data_dir, "obs_counts_vary_alpha", rep_dir, "observed_counts.txt.gz"), index_col=0
         ).mean(axis=1)
     except OSError:
         gene_means = pd.read_table(
-            os.path.join(data_dir, rep_dir, "obs_counts.txt.gz"), index_col=0
+            os.path.join(data_dir, "obs_counts_vary_alpha", rep_dir, "obs_counts.txt.gz"), index_col=0
         ).mean(axis=1)
-
-    module_indices = get_module_indices(os.path.join(data_dir, rep_dir))
 
     # Load predicted data
     if which == 'Hotspot':
@@ -194,11 +171,11 @@ def compute_results(rep, which):
         genes = ge_groups.index[ge_groups == cc]
         p, r, a = compute_stats(all_genes.loc[genes])
         group_results.append(
-            [i, p, r, a]
+            [rep, i, p, r, a]
         )
     group_results = pd.DataFrame(
         group_results,
-        columns=['GEQ', 'Precision', 'Recall', 'Accuracy']
+        columns=['Alpha', 'GEQ', 'Precision', 'Recall', 'Accuracy']
     )
 
     # What about for each module?
@@ -210,11 +187,11 @@ def compute_results(rep, which):
             continue
         p, r, a = compute_stats(all_genes.loc[all_genes.TrueModule == mod])
         module_results.append(
-            [mod, p, r, a]
+            [rep, mod, p, r, a]
         )
     module_results = pd.DataFrame(
         module_results,
-        columns=['TrueModule', 'Precision', 'Recall', 'Accuracy']
+        columns=['Alpha', 'TrueModule', 'Precision', 'Recall', 'Accuracy']
     )
 
     # What about for gene_mean bins?
@@ -226,11 +203,11 @@ def compute_results(rep, which):
         genes = ge_groups.index[ge_groups == cc]
         p, r, a = compute_stats(all_genes.loc[genes])
         mean_results.append(
-            [i, p, r, a]
+            [rep, i, p, r, a]
         )
     mean_results = pd.DataFrame(
         mean_results,
-        columns=['Mean', 'Precision', 'Recall', 'Accuracy']
+        columns=['Alpha', 'Mean', 'Precision', 'Recall', 'Accuracy']
     )
 
     # What about combination of mean and of gene effect size?
@@ -257,14 +234,16 @@ def compute_results(rep, which):
 
     ge_mean_results = pd.DataFrame(
         ge_mean_results,
-        columns=['Rep', 'GEQ', 'MeanQuantile', 'Precision', 'Recall', 'Accuracy', 'NGenes']
+        columns=['Alpha', 'GEQ', 'MeanQuantile', 'Precision', 'Recall', 'Accuracy', 'NGenes']
     )
 
-    return (precision, recall, accuracy), group_results, module_results, mean_results, ge_mean_results
+    return (rep, precision, recall, accuracy), group_results, module_results, mean_results, ge_mean_results
 
 # %%
 
-reps = list(range(1, 11))
+alpha_means = ["0.01", "0.02", "0.05", "0.10", "0.15", "0.2"]
+reps = alpha_means
+
 from tqdm import tqdm
 
 all_res = []
@@ -281,7 +260,7 @@ for method in ['Grnboost', 'Hotspot', 'Pearson', 'WGCNA', 'ICA']:
     ge_mean_results_method = [x[4] for x in all_res_method]
     all_res_method = [x[0] for x in all_res_method]
     all_res_method = pd.DataFrame(
-        all_res_method, columns=['Precision', 'Recall', 'Accuracy']
+        all_res_method, columns=['Alpha', 'Precision', 'Recall', 'Accuracy']
     )
     all_res_method['Method'] = method
 
@@ -317,8 +296,13 @@ module_res = pd.concat(module_res)
 mean_res = pd.concat(mean_res)
 ge_mean_res = pd.concat(ge_mean_res)
 
+all_res['AlphaPercent'] = [str(int(float(x)*100)) for x in all_res['Alpha']]
+
 # %%
 
+plt.figure()
+sns.barplot(data=all_res, hue='Method', y='Accuracy', x='AlphaPercent')
+plt.show()
 
 # plt.figure()
 # sns.boxplot(data=all_res, x='Method', y='Precision')
@@ -366,7 +350,26 @@ plt.xticks([0, 1, 2, 3, 4], ['1', '2', '3', '4', '5'])
 plt.title('Accuracy per\n Gene Effect Quantile')
 plt.grid(axis='y', color='#999999', ls=(0, (5, 5)), lw=.5)
 plt.subplots_adjust(bottom=0.2)
-plt.savefig('ModuleAccuracy_GEQuantile.svg')
+plt.savefig('ModuleAccuracy_GEQuantile_capture_efficiency.svg')
+
+# %% By Capture Efficiency
+
+m_order = ['WGCNA', 'Grnboost', 'Pearson', 'ICA', 'Hotspot']
+order = natsorted(all_res['AlphaPercent'].unique())
+
+fig = plt.figure()
+
+sns.barplot(
+    data=all_res, x='AlphaPercent', y='Accuracy',
+    hue='Method', hue_order=m_order,
+    alpha=0.9, order=order,
+)
+plt.xlabel('Simulated Capture Efficiency (%)')
+plt.title('Accuracy vs.\nCapture Efficiency')
+plt.grid(axis='y', color='#999999', ls=(0, (5, 5)), lw=.5)
+plt.subplots_adjust(bottom=0.2)
+# plt.savefig('ModuleAccuracy_capture_efficiency.svg')
+plt.show()
 
 # %% By Module
 
@@ -411,74 +414,74 @@ plt.title('Accuracy per\n Gene Mean Quantile')
 plt.gca().set_axisbelow(True)
 plt.grid(axis='y', color='#999999', ls=(0, (5, 5)), lw=.5)
 plt.subplots_adjust(bottom=0.2)
-plt.savefig('ModuleAccuracy_MeanQuantile.svg')
-# plt.show()
+# plt.savefig('ModuleAccuracy_MeanQuantile_capture_efficiency.svg')
+plt.show()
 
 
 # %% By combinations of mean and effect size:
 
-# if ge_mean_res['GEQ'].min() == 0:
-#     ge_mean_res['GEQ'] = ge_mean_res['GEQ'] + 1
-# 
-# if ge_mean_res['MeanQuantile'].min() == 0:
-#     ge_mean_res['MeanQuantile'] = ge_mean_res['MeanQuantile'] + 1
-# 
-# plot_data_hs = ge_mean_res.loc[ge_mean_res.Method == 'Hotspot']
-# plot_data_hs = plot_data_hs.groupby(['GEQ', 'MeanQuantile']).mean() \
-#     .reset_index() \
-#     .pivot(index='GEQ', columns='MeanQuantile', values='Accuracy')
-# 
-# plot_data_reg = ge_mean_res.loc[ge_mean_res.Method == 'Pearson']
-# plot_data_reg = plot_data_reg.groupby(['GEQ', 'MeanQuantile']).mean() \
-#     .reset_index() \
-#     .pivot(index='GEQ', columns='MeanQuantile', values='Accuracy')
-# 
-# 
-# delta = (
-#     ge_mean_res.loc[ge_mean_res.Method == 'Hotspot']
-#     .set_index(['Rep', 'GEQ', 'MeanQuantile'])['Accuracy']
-# ) - (
-#     ge_mean_res.loc[ge_mean_res.Method == 'Pearson']
-#     .set_index(['Rep', 'GEQ', 'MeanQuantile'])['Accuracy']
-# )
-# 
-# delta = delta.reset_index().groupby(['GEQ', 'MeanQuantile'])['Accuracy'].mean()
-# delta = delta.reset_index().pivot(
-#     index='GEQ', columns='MeanQuantile', values='Accuracy'
-# )
-# 
-# fig, axs = plt.subplots(2, 2, figsize=(7, 7),
-#                         gridspec_kw=dict(
-#                             hspace=0.55, wspace=0.35
-#                         )
-#                         )
-# plt.sca(axs[0, 0])
-# sns.heatmap(plot_data_hs*100, vmin=0, vmax=100,
-#             cbar_kws=dict(
-#                 ticks=[0, 50, 100],
-#             ))
-# plt.title('Hotspot')
-# plt.xlabel('Gene Expression Level\n(Quantile)')
-# plt.ylabel('Gene-Effect\n(Quantile)')
-# 
-# plt.sca(axs[0, 1])
-# sns.heatmap(plot_data_reg*100, vmin=0, vmax=100,
-#             cbar_kws=dict(
-#                 ticks=[0, 50, 100],
-#             ))
-# plt.title('Pearson')
-# plt.xlabel('Gene Expression Level\n(Quantile)')
-# plt.ylabel('Gene-Effect\n(Quantile)')
-# 
-# plt.sca(axs[1, 0])
-# sns.heatmap(delta*100, cmap="RdBu_r",
-#             vmin=-30, vmax=30,
-#             cbar_kws=dict(
-#                 ticks=[-30, 0, 30],
-#             ))
-# plt.xlabel('Gene Expression Level\n(Quantile)')
-# plt.ylabel('Gene-Effect\n(Quantile)')
-# 
-# axs[1, 1].remove()
-# plt.show()
-# # plt.savefig('ModuleAccuracy2.svg')
+if ge_mean_res['GEQ'].min() == 0:
+    ge_mean_res['GEQ'] = ge_mean_res['GEQ'] + 1
+
+if ge_mean_res['MeanQuantile'].min() == 0:
+    ge_mean_res['MeanQuantile'] = ge_mean_res['MeanQuantile'] + 1
+
+plot_data_hs = ge_mean_res.loc[ge_mean_res.Method == 'Hotspot']
+plot_data_hs = plot_data_hs.groupby(['GEQ', 'MeanQuantile']).mean() \
+    .reset_index() \
+    .pivot(index='GEQ', columns='MeanQuantile', values='Accuracy')
+
+plot_data_reg = ge_mean_res.loc[ge_mean_res.Method == 'Pearson']
+plot_data_reg = plot_data_reg.groupby(['GEQ', 'MeanQuantile']).mean() \
+    .reset_index() \
+    .pivot(index='GEQ', columns='MeanQuantile', values='Accuracy')
+
+
+delta = (
+    ge_mean_res.loc[ge_mean_res.Method == 'Hotspot']
+    .set_index(['Rep', 'GEQ', 'MeanQuantile'])['Accuracy']
+) - (
+    ge_mean_res.loc[ge_mean_res.Method == 'Pearson']
+    .set_index(['Rep', 'GEQ', 'MeanQuantile'])['Accuracy']
+)
+
+delta = delta.reset_index().groupby(['GEQ', 'MeanQuantile'])['Accuracy'].mean()
+delta = delta.reset_index().pivot(
+    index='GEQ', columns='MeanQuantile', values='Accuracy'
+)
+
+fig, axs = plt.subplots(2, 2, figsize=(7, 7),
+                        gridspec_kw=dict(
+                            hspace=0.55, wspace=0.35
+                        )
+                        )
+plt.sca(axs[0, 0])
+sns.heatmap(plot_data_hs*100, vmin=0, vmax=100,
+            cbar_kws=dict(
+                ticks=[0, 50, 100],
+            ))
+plt.title('Hotspot')
+plt.xlabel('Gene Expression Level\n(Quantile)')
+plt.ylabel('Gene-Effect\n(Quantile)')
+
+plt.sca(axs[0, 1])
+sns.heatmap(plot_data_reg*100, vmin=0, vmax=100,
+            cbar_kws=dict(
+                ticks=[0, 50, 100],
+            ))
+plt.title('Pearson')
+plt.xlabel('Gene Expression Level\n(Quantile)')
+plt.ylabel('Gene-Effect\n(Quantile)')
+
+plt.sca(axs[1, 0])
+sns.heatmap(delta*100, cmap="RdBu_r",
+            vmin=-30, vmax=30,
+            cbar_kws=dict(
+                ticks=[-30, 0, 30],
+            ))
+plt.xlabel('Gene Expression Level\n(Quantile)')
+plt.ylabel('Gene-Effect\n(Quantile)')
+
+axs[1, 1].remove()
+plt.show()
+# plt.savefig('ModuleAccuracy2_capture_efficiency.svg')

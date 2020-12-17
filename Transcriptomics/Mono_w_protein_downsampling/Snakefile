@@ -1,0 +1,8 @@
+subworkflow data:
+    workdir:
+        "../../data/10x_PBMC_w_proteins/"
+
+data_file = "mono/downsampled_{rate}/data.loom"
+data_file_test = "mono/data_test.loom"
+
+include: "../Snakefile_downsampling"

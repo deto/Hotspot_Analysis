@@ -71,7 +71,7 @@ counts = counts.loc[valid_genes]
 # Compute distance matrix
 
 latent = pd.DataFrame(0, index=counts.columns, columns=range(10))
-hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, latent=latent, umi_counts=num_umi)
 
 neighbors, weights = hotspot.knn.tree_neighbors_and_weights(
     t, n_neighbors, counts)
@@ -88,7 +88,7 @@ weights = pd.DataFrame(weights, index=neighbors.index, columns=neighbors.columns
 hs.weights = weights
 hs.neighbors = neighbors
 
-results = hs.compute_hotspot(model=model, jobs=5, centered=True)
+results = hs.compute_hotspot(jobs=5)
 
 results = gene_info.join(results, how='right')
 

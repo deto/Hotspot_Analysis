@@ -106,14 +106,14 @@ for i in tqdm(range(cm.shape[0])):
 
 dist_mat = pd.DataFrame(dist_mat, index=cm.index, columns=cm.index)
 
-hs = hotspot.Hotspot(counts, distances=dist_mat, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, distances=dist_mat, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=weighted_graph, n_neighbors=n_neighbors,
     neighborhood_factor=3
 )
 
-results = hs.compute_hotspot(model=model, jobs=5, centered=True)
+results = hs.compute_hotspot(jobs=5)
 
 results = gene_info.join(results, how='right')
 

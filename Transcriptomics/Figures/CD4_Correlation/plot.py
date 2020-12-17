@@ -112,41 +112,99 @@ plt.savefig('CD4_ModuleCorelation_legend.svg')
 # %% Plot Module Scores
 # %% Load data
 
-fig, axs = plt.subplots(
-    3, 4, figsize=(9, 7),
-    gridspec_kw=dict(
-        left=.05, right=.95, top=.95, bottom=.05
-    ),
-)
+from itertools import zip_longest
 
-cbar_ax = fig.add_axes(
-    [.95, .05, .01, .1]
-)
+def plot_scores_umap(scores, proj, vmin='auto', vmax='auto'):
 
-for ax, module in zip(axs.ravel(), scores.columns):
-    plt.sca(ax)
-
-    vals = scores[module]
-
-    vmin = np.percentile(vals, 5)
-    vmax = np.percentile(vals, 95)
-    vmin = -2
-    vmax = 2
-
-    sc = plt.scatter(
-        x=proj.iloc[:, 0],
-        y=proj.iloc[:, 1],
-        c=vals,
-        vmin=vmin, vmax=vmax,
-        s=2, rasterized=True
+    fig, axs = plt.subplots(
+        2, 6, figsize=(15, 6),
+        gridspec_kw=dict(
+            left=.05, right=.95, top=.95, bottom=.05
+        ),
     )
-    plt.xticks([])
-    plt.yticks([])
-    for sp in ax.spines.values():
-        sp.set_visible(False)
-    plt.title(module)
 
-plt.colorbar(sc, cax=cbar_ax)
+    cbar_ax = fig.add_axes(
+        [.95, .05, .01, .1]
+    )
+
+    for ax, module in zip_longest(axs.ravel(), scores.columns):
+        plt.sca(ax)
+
+        if module is None:
+            ax.remove()
+            continue
+
+        vals = scores[module].values.copy()
+
+        if vmin == 'auto':
+            _vmin = np.percentile(vals, 5)
+        else:
+            _vmin = vmin
+
+        if vmax == 'auto':
+            _vmax = np.percentile(vals, 95)
+        else:
+            _vmax = vmax
+
+        sc = plt.scatter(
+            x=proj.iloc[:, 0],
+            y=proj.iloc[:, 1],
+            c=vals,
+            vmin=_vmin, vmax=_vmax,
+            s=2, rasterized=True
+        )
+        plt.xticks([])
+        plt.yticks([])
+        for sp in ax.spines.values():
+            sp.set_visible(False)
+        plt.title(module)
+
+    plt.colorbar(sc, cax=cbar_ax)
+    return fig
+
+# %%
 
 # plt.show()
+scores.columns = [
+    'Hotspot-{}'.format(i+1) for i in range(len(scores.columns))
+]
+fig = plot_scores_umap(scores, proj, vmin=-2, vmax=2)
 plt.savefig('CD4_ModuleScore_UMAPs.svg', dpi=300)
+plt.close()
+
+# %% Do the same for WGCNA
+
+scores_wgcna = pd.read_table(
+    "../../CD4_w_protein/wgcna/module_scores.txt",
+    index_col=0
+)
+scores_wgcna.columns = [
+    'WGCNA-{}'.format(i+1) for i in range(len(scores_wgcna.columns))
+]
+
+fig = plot_scores_umap(scores_wgcna, proj)
+plt.savefig('CD4_ModuleScore_UMAPs_wgcna.svg', dpi=300)
+plt.close()
+
+# %% Do the same for ICA
+
+scores_ica = pd.read_table(
+    "../../CD4_w_protein/ica10/cell_loadings.txt",
+    index_col=0
+)
+
+fdr_ica = pd.read_table(
+    "../../CD4_w_protein/ica10/components_fdr.txt",
+    index_col=0
+)
+
+scores_ica = scores_ica.loc[
+    :, fdr_ica.min(axis=0) <= .05
+]
+
+scores_ica.columns = [
+    'ICA-{}'.format(i+1) for i in range(len(scores_ica.columns))
+]
+fig = plot_scores_umap(scores_ica, proj)
+plt.savefig('CD4_ModuleScore_UMAPs_ica.svg', dpi=300)
+plt.close()

@@ -6,18 +6,22 @@ plt.rcParams['svg.fonttype'] = 'none'
 
 # %%
 
-tsne = pd.read_table("../../Simulation4/rep2/tsne/tsne_pca.txt", index_col=0)
+tsne = pd.read_table("../../Simulation6/rep2/tsne/tsne_pca.txt", index_col=0)
 
 ce = pd.read_table(
-    "../../../data/Simulated4/rep2/cell_effects.txt", index_col=0
+    "../../../data/Simulated6/rep2/cell_meta.txt", index_col=0
 )
+
+ce = ce.loc[
+    :, [x for x in ce.columns if 's_DE' in x]
+]
 
 data = tsne.join(ce)
 
 # %%
 
 
-fig, axs = plt.subplots(1, ce.shape[1]-1, figsize=(9, 2.5))
+fig, axs = plt.subplots(1, ce.shape[1], figsize=(9, 2.5))
 cbar_ax = fig.add_axes([.9, .1, .01, .2])
 
 import matplotlib.colors
@@ -25,19 +29,15 @@ cmap = matplotlib.colors.LinearSegmentedColormap.from_list(
     'grays', ['#D2D2D2', '#000000']
 )
 
-for ax, col in zip(
-    axs.ravel(), ce.columns[1:]
+for ax, col, i in zip(
+    axs.ravel(), ce.columns, np.arange(ce.shape[1])
 ):
 
     plt.sca(ax)
     vals = data[col]
-    if 'evf1' in col or 'evf5' in col:
-        vals = vals.subtract(vals.mean()).divide(vals.std())
-        vmin = -1
-        vmax = 1
-    else:
-        vmin = 0
-        vmax = 1.5
+
+    vmin = np.percentile(vals, 5)
+    vmax = np.percentile(vals, 95)
 
     sc = plt.scatter(
         x=data.tsne1, y=data.tsne2, c=vals,
@@ -48,9 +48,9 @@ for ax, col in zip(
     plt.yticks([])
     for sp in ax.spines.values():
         sp.set_visible(False)
-    plt.title(col[-1])
+    plt.title('EVF {}'.format(i+1))
 
-cb = plt.colorbar(sc, cax=cbar_ax, ticks=[-1, 1])
+cb = plt.colorbar(sc, cax=cbar_ax, ticks=[vmin, vmax])
 cb.set_label('Cell-Effect', labelpad=10, rotation=0, size=9, verticalalignment='center')
 cbar_ax.set_yticklabels(['Low', 'High'], size=7)
 

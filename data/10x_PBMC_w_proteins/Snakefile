@@ -1,12 +1,14 @@
 
 rule download_data:
     output:
-        h5="raw/5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5"
+        h5="raw/5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5",
+        mol_info="raw/5k_pbmc_protein_v3_molecule_info.h5"
     shell:
         """
         mkdir -p raw
         cd raw
         wget http://cf.10xgenomics.com/samples/cell-exp/3.0.2/5k_pbmc_protein_v3/5k_pbmc_protein_v3_filtered_feature_bc_matrix.h5 
+        wget http://cf.10xgenomics.com/samples/cell-exp/3.0.2/5k_pbmc_protein_v3/5k_pbmc_protein_v3_molecule_info.h5
         """
 
 rule parse_data:
@@ -43,6 +45,52 @@ rule parse_data_monocytes:
         loom=protected("mono/data.loom"),
         ab="mono/ab.txt.gz",
     script: "parse_monocytes.py"
+
+rule split_cd4_data:
+    input:
+        loom=rules.parse_data_cd4.output.loom,
+    output:
+        loom_test=protected("cd4/data_test.loom"),
+        loom_train=protected("cd4/data_train.loom"),
+    script: "split_data.py"
+
+rule split_mono_data:
+    input:
+        loom=rules.parse_data_monocytes.output.loom,
+    output:
+        loom_test=protected("mono/data_test.loom"),
+        loom_train=protected("mono/data_train.loom"),
+    script: "split_data.py"
+
+
+rule create_downsampled_cd4:
+    input:
+        loom=rules.split_cd4_data.output.loom_train,
+        mol_info=rules.download_data.output.mol_info,
+    params:
+        rate="{rate}"
+    output:
+        loom=protected("cd4/downsampled_{rate}/data.loom"),
+        ab="cd4/downsampled_{rate}/ab.txt.gz"
+    script: "downsample.py"
+
+rule create_downsampled_mono:
+    input:
+        loom=rules.split_mono_data.output.loom_train,
+        mol_info=rules.download_data.output.mol_info,
+    params:
+        rate="{rate}"
+    output:
+        loom=protected("mono/downsampled_{rate}/data.loom"),
+        ab="mono/downsampled_{rate}/ab.txt.gz"
+    script: "downsample.py"
+
+rates = ["100", "80", "60", "40", "20", "10", "5"]
+
+rule make_all_downsampled:
+    input:
+        expand(rules.create_downsampled_cd4.output.loom, rate=rates),
+        expand(rules.create_downsampled_mono.output.loom, rate=rates),
 
 
 rule all:

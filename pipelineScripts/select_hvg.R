@@ -16,13 +16,6 @@ ds$close_all()
 rownames(counts) <- gene_symbols
 colnames(counts) <- barcodes
 
-if ("doXcutoff" %in% names(snakemake@params) &&
-    snakemake@params[["doXcutoff"]]) {
-    x.cutoff <- 3
-} else {
-    x.cutoff <- 100
-}
-
 if ("lowXcutoff" %in% names(snakemake@params)) {
     lowXcutoff <- snakemake@params[["lowXcutoff"]]
 } else {

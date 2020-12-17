@@ -106,4 +106,13 @@ rule runHotspot_threshold_proteins:
         results="hotspot/hotspot_threshold_proteins.txt"
     script: "pipelineScripts/hotspot/runHotspotProteins.py"
 
-
+rule runGearyC_threshold:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI_threshold.output.latent,
+    params:
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="gearyc/threshold/gearyc.txt",
+    script: "pipelineScripts/hotspot/autocorr.py"

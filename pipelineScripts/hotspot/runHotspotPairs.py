@@ -6,7 +6,6 @@ loom_file = snakemake.input['loom']
 latent_file = snakemake.input['latent']
 hs_results_file = snakemake.input['hs_results']
 
-out_file_lc = snakemake.output['results_lc']
 out_file_lcz = snakemake.output['results_z']
 
 model = snakemake.params['model']
@@ -59,7 +58,7 @@ num_umi = num_umi[latent.index]
 
 # need counts, latent, and num_umi
 
-hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, latent=latent, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=False, n_neighbors=n_neighbors, neighborhood_factor=3
@@ -84,7 +83,7 @@ if genes_file is not None:
 
 hs_genes = hs_genes & counts.index
 
-lc, lcz = hs.compute_modules(hs_genes, model=model, centered=True, jobs=20)
+lcz = hs.compute_local_correlations(hs_genes, jobs=20)
+lcz = lcz.fillna(0)
 
-lc.to_csv(out_file_lc, sep="\t", compression="gzip")
 lcz.to_csv(out_file_lcz, sep="\t", compression="gzip")

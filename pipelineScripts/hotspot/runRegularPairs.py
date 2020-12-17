@@ -67,5 +67,6 @@ c_counts = create_centered_counts(
 
 lc = np.corrcoef(c_counts)
 lc = pd.DataFrame(lc, index=counts.index, columns=counts.index)
+lc = lc.fillna(0)
 
 lc.to_csv(out_file_lc, sep="\t", compression="gzip")

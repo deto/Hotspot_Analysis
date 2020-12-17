@@ -19,14 +19,15 @@ os.makedirs(out_dir, exist_ok=True)
 ab = pd.read_csv(in_ab, index_col=0, sep="\t")
 
 
-def log_scale(x):
+def clr(x):
 
-    x = np.log2(x+1)
+    x = np.log(x+1)
+    x = x.subtract(x.mean(axis=1), axis=0)
 
     return x
 
 
-ab_clr = log_scale(ab)
+ab_clr = clr(ab)
 
 # import matplotlib.pyplot as plt
 # plt.figure()
@@ -40,14 +41,14 @@ ab_clr = log_scale(ab)
 
 
 is_mono = (
-    (ab_clr['CD14'] > 5.1)
+    (ab_clr['CD14'] > 2)
 ).values
 
-ab_cd4 = ab.loc[is_mono]
+ab_mono = ab.loc[is_mono]
 
 with loompy.connect(in_loom, mode='r') as ds:
     with loompy.new(out_loom) as ds_out:
         view = ds.view[:, is_mono]
         ds_out.add_columns(view.layers, col_attrs=view.ca, row_attrs=view.ra)
 
-ab_cd4.to_csv(out_ab, sep="\t", compression='gzip')
+ab_mono.to_csv(out_ab, sep="\t", compression='gzip')

@@ -3,9 +3,12 @@ subworkflow data:
         "../../data/10x_PBMC_w_proteins"
 
 data_file = "cd4/data.loom"
+data_file_train = "cd4/data_train.loom"
+data_file_test = "cd4/data_test.loom"
 ab_file = "cd4/ab.txt.gz"
 
 include: "../latentTestsSnake/Snakefile"
+include: "../Snakefile_splits"
 
 rule computeGRScores:
     input:
@@ -13,3 +16,38 @@ rule computeGRScores:
     output:
         out="evaluation/geneRelevanceScores.txt"
     script: "scripts/computeGeneRelevanceScores.py"
+
+rule runWGCNA:
+    input:
+        loom=data(data_file),
+        genes="genes/threshold.txt",
+    params:
+        power="auto",
+        min_module_size=15,
+    output:
+        cluster_output="wgcna/modules.txt",
+        scores="wgcna/module_scores.txt",
+    script: "../../pipelineScripts/wgcna/wgcna.R"
+
+rule runICA10:
+    input:
+        loom=data(data_file),
+        genes="genes/threshold.txt",
+    params:
+        n_components=10,
+    output:
+        components="ica10/components.txt",
+        cell_loadings="ica10/cell_loadings.txt"
+    script: "../../pipelineScripts/ICA/run_ica.py"
+
+rule runICA10_fdr:
+    input:
+        components=rules.runICA10.output.components,
+    params:
+        qvalcutoff=1e-3,
+    output:
+        components_fdr="ica10/components_fdr.txt",
+        modules="ica10/modules.txt",
+    script: "../../pipelineScripts/ICA/run_ica_fdr.R"
+
+include: "Snakefile_k_sensitivity"

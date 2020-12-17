@@ -10,7 +10,7 @@ model = snakemake.params['model']
 
 
 try:
-    n_neighbors = snakemake.params['n_neighbors']
+    n_neighbors = int(snakemake.params['n_neighbors'])
 except AttributeError:
     n_neighbors = 30
 
@@ -28,6 +28,13 @@ try:
     weighted_graph = snakemake.params['weighted_graph']
 except AttributeError:
     weighted_graph = False
+
+try:
+    n_bins_bernoulli = int(snakemake.params['n_bins_bernoulli'])
+    from hotspot import bernoulli_model
+    bernoulli_model.N_BIN_TARGET = n_bins_bernoulli
+except AttributeError:
+    pass
 
 with loompy.connect(loom_file, 'r') as ds:
     barcodes = ds.ca['Barcode'][:]
@@ -56,13 +63,13 @@ num_umi = num_umi[latent.index]
 valid_genes = (counts > 0).sum(axis=1) >= n_cells_min
 counts = counts.loc[valid_genes]
 
-hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, latent=latent, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=weighted_graph, n_neighbors=n_neighbors, neighborhood_factor=3
 )
 
-results = hs.compute_hotspot(model=model, jobs=5, centered=True)
+results = hs.compute_hotspot(jobs=5)
 
 results = gene_info.join(results, how='right')
 

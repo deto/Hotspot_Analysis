@@ -102,7 +102,7 @@ hs_results = hs_results.loc[counts.index & hs_results.index]
 genes_sub = hs_results.sort_values('Z', ascending=False).index[0:N_GENES]
 counts = counts.loc[genes_sub, :]
 
-hs = hotspot.Hotspot(counts, latent=latent, umi_counts=num_umi)
+hs = hotspot.Hotspot(counts, model=model, latent=latent, umi_counts=num_umi)
 
 hs.create_knn_graph(
     weighted_graph=False, n_neighbors=N_NEIGHBORS, neighborhood_factor=3
@@ -111,7 +111,7 @@ hs.create_knn_graph(
 
 start = time.time()
 
-lc, lcz = hs.compute_modules(genes_sub, model=model, centered=True, jobs=N_JOBS)
+lcz = hs.compute_local_correlations(genes_sub, jobs=N_JOBS)
 
 modules, Z = hotspot.modules.compute_modules(
     lcz, min_gene_threshold=20,
