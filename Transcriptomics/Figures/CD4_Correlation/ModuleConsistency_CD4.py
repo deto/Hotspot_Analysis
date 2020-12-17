@@ -1,14 +1,16 @@
+"""
+Plots module consistence for the CD4 data between the train/test splits
+See the _Monocyte.py version for a nearly identical script on the Monocyte data
+"""
 import os
 import pandas as pd
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
- 
+
 plt.rcParams['svg.fonttype'] = 'none'
 
-# Pick which set of results to plot - CD4 or Monocytes
-# base_dir = '../../CD4_w_protein'
-base_dir = '../../Mono_w_protein'
+base_dir = '../../CD4_w_protein'
 
 datasets = [
     {
@@ -180,6 +182,4 @@ plt.gca().set_axisbelow(True)
 plt.grid(color='#CCCCCC', lw=0.5, axis='y', ls=(0, (5, 5)))
 
 plt.subplots_adjust(bottom=.25, wspace=0.4, left=0.1, right=0.9)
-# plt.savefig('CD4_Module_TrainTest.svg')
-plt.savefig('Monocyte_Module_TrainTest.svg')
-# plt.show()
+plt.savefig('CD4_Module_TrainTest.svg')

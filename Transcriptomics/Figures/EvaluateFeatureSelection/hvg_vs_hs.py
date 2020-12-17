@@ -14,30 +14,6 @@ hvg = pd.read_table("../../CD4_w_protein/genes/hvg_info.txt", index_col=0)
 hvg = hvg.loc[hs.index]
 
 
-# %% Plot one vs other
-
-# plot_data = hs[['Symbol', 'Z']].join(
-#     hvg[['gene.dispersion.scaled', 'gene.mean']]
-# )
-# 
-# plt.figure(figsize=(5, 5))
-# 
-# plt.plot(
-#     plot_data['gene.dispersion.scaled'],
-#     plot_data['Z'],
-#     'o', ms=2, rasterized=True
-# )
-# 
-# plt.gca().set_axisbelow(True)
-# plt.xlabel('Scaled Dispersion')
-# plt.ylabel('Autocorrelation Z')
-# plt.grid(color='#BBBBBB', ls=(0, (5, 5)), lw=.5)
-# plt.subplots_adjust(left=0.15, right=1-0.15, bottom=0.15, top=1-0.15)
-# 
-# plt.show()
-# plt.savefig('autocorrelation_vs_hvg.svg', dpi=300)
-
-
 # %%
 
 loom_file = "../../../data/10x_PBMC_w_proteins/cd4/data.loom"
