@@ -93,7 +93,6 @@ rule runHotspotPairs_transcriptomics:
         n_neighbors=30,
         use_umi=True,
     output:
-        results_lc="hotspot/hotspot_pairs_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "../../pipelineScripts/hotspot/runHotspotPairs.py"
 
@@ -152,7 +151,6 @@ rule runHotspotPairs_lineage:
         n_neighbors=30,
         use_umi=True,
     output:
-        results_lc="hotspot/hotspot_pairs_lineage_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_lineage_z.txt.gz"
     script: "../../pipelineScripts/hotspot/runHotspotPairsLineage.py"
 
@@ -167,7 +165,6 @@ rule runHotspotPairs_lineage_tree:
         n_neighbors=30,
         use_umi=True,
     output:
-        results_lc="hotspot/hotspot_pairs_lineage_tree_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_lineage_tree_z.txt.gz"
     script: "../../pipelineScripts/hotspot/runHotspotPairsLineageTree.py"
 
