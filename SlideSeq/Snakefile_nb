@@ -1,0 +1,40 @@
+# Series of steps to perform the analysis using the negative binomial model
+# instead of the bernoulli model
+
+rule runHotspot_negbinom:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='danb',
+        n_neighbors=300,
+    output:
+        results="neg_binom/hotspot/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspotPairs_negbinom:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+        hs_results=rules.runHotspot_negbinom.output.results,
+    params:
+        model='danb',
+        fdrThresh=0.05,
+        n_neighbors=30,
+    output:
+        results_z="neg_binom/hotspot/hotspot_pairs_z.txt.gz"
+    script: "../pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule extractHotspotModules_negbinom:
+    input:
+        results_z=rules.runHotspotPairs_negbinom.output.results_z,
+    params:
+        min_cluster_genes=20,
+        core_only=False,
+        #z_threshold=1.65,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="neg_binom/hotspot/module_heatmap.svg",
+        cluster_output="neg_binom/hotspot/modules.txt",
+        linkage_output="neg_binom/hotspot/linkage.txt",
+    script: "../pipelineScripts/hotspot/extractHotspotModules.py"

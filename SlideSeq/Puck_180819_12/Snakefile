@@ -30,13 +30,24 @@ rule TSNE_threshold:
         out="tsne/tsne_threshold.txt",
     script: "../../pipelineScripts/tsne/tsne.py"
 
+rule UMAP_threshold:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        n_neighbors=300,
+    output:
+        out="umap/umap_threshold.txt",
+        out3="umap/umap3_threshold.txt",
+    script: "../../pipelineScripts/umap/umap.py"
+
 rule cluster_threshold:
     message: "Creating clusters on PCA-threshold"
     input:
         latent=rules.PCA_threshold.output.latent,
         tsne=rules.TSNE_threshold.output.out,
     params:
-        n_neighbors=30,
+        n_neighbors=300,
         resolution=1,
     output:
         cluster_colors="clusters/cluster_colors_threshold.json",
@@ -71,8 +82,39 @@ rule select_hvg:
     params:
         lowXcutoff=0.5,
     output:
-        genes="genes/hvg.txt"
+        genes="genes/hvg.txt",
+        geneInfo="genes/hvg_info.txt",
     script: "../../pipelineScripts/select_hvg.R"
+
+rule select_danb:
+    input:
+        loom=data("data.loom"),
+    params:
+        highXMeanCutoff=20,
+    output:
+        genes="genes/danb.txt",
+        geneInfo="genes/danb_info.txt"
+    script: "../../pipelineScripts/select_danb.R"
+
+rule select_pca:
+    input:
+        loom=data("data.loom"),
+    params:
+        highXMeanCutoff=20,
+    output:
+        genes="genes/pca.txt",
+        geneInfo="genes/pca_info.txt"
+    script: "../../pipelineScripts/select_pca.R"
+
+rule runGearyC:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        n_neighbors=300,
+    output:
+        results="autocorrelation/autocorrelation.txt",
+    script: "../../pipelineScripts/hotspot/autocorr.py"
 
 rule PCA_hvg:
     message: "Computing PCA on highly-variable genes"
@@ -91,13 +133,24 @@ rule TSNE_hvg:
         out="tsne/tsne_hvg.txt",
     script: "../../pipelineScripts/tsne/tsne.py"
 
+rule UMAP_hvg:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA_hvg.output.latent,
+    params:
+        n_neighbors=300,
+    output:
+        out="umap/umap_hvg.txt",
+        out3="umap/umap3_hvg.txt",
+    script: "../../pipelineScripts/umap/umap.py"
+
 rule cluster_hvg:
     message: "Creating clusters on PCA-hvg"
     input:
         latent=rules.PCA_hvg.output.latent,
         tsne=rules.TSNE_hvg.output.out,
     params:
-        n_neighbors=30,
+        n_neighbors=300,
         resolution=1,
     output:
         cluster_colors="clusters/cluster_colors_hvg.json",
@@ -276,3 +329,26 @@ rule timingsPairs:
     input: 
         expand(rules.timeHotspotPairs.output.results, N_GENES=[200, 500, 1000], N_CELLS=[1000, 2000, 5000, 10000]),
         expand(rules.timeSpatialDEClusters.output.log, N_GENES=[500], N_CELLS=[1000, 2000, 5000, 10000]),
+
+###################
+#  Bernoulli Bins #
+###################
+
+rule runHotspot_bernoulli_bins:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli',
+        n_neighbors=300,
+        n_bins_bernoulli='{n_bins_bernoulli}',
+    output:
+        results="bernoulli_bins/{n_bins_bernoulli}_bins/hotspot.txt"
+    script: "../../pipelineScripts/hotspot/runHotspot.py"
+
+
+N_BINS_BERNOULLI = [5, 10, 20, 30, 50, 75, 100]
+
+rule runHotspot_bernoulli_bins_all:
+    input:
+        expand(rules.runHotspot_bernoulli_bins.output.results, n_bins_bernoulli=N_BINS_BERNOULLI),

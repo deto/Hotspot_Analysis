@@ -98,31 +98,6 @@ sns.boxplot(x='Method', y='AUC', data=aucs)
 plt.ylim(0, 1)
 plt.show()
 
-# %% Ok - this is very promising.  What if we just looked at average expression tho...
-pucks = [
-    "Puck_180819_9",
-    "Puck_180819_10",
-    "Puck_180819_11",
-    "Puck_180819_12",
-]
-
-puck_means = {}
-for puck in pucks:
-    ls = loompy.connect("../../../data/SlideSeq/{}/data.loom".format(puck), mode="r")
-    counts = ls.layers['scaled'][:, :]
-    gene_info = ls.ra['EnsID', 'Symbol']
-    ls.close()
-
-    # Have to do this because data_slideseq makes it a numpy array
-    gene_info = pd.DataFrame(
-        gene_info, columns=['EnsID', 'Symbol']).set_index('EnsID')
-    counts = pd.DataFrame(counts, index=gene_info.index)
-
-    # need counts, latent, and num_umi
-    valid_genes = (counts > 0).sum(axis=1) > 50
-    gene_means = counts.loc[valid_genes].mean(axis=1)
-    puck_means[puck] = gene_means
-    del counts
 
 # %%
 

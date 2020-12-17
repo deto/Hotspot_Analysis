@@ -1,0 +1,34 @@
+k_values = [5, 10, 30, 50, 100, 300, 500, 1000, 3000]
+
+rule runHotspot_k_sensitivity:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli',
+        n_neighbors='{k}',
+    output:
+        results="k_sensitivity/k_{k}/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+
+rule runHotspot_k_sensitivity_all:
+    input:
+        expand(rules.runHotspot_k_sensitivity.output.results, k=k_values)
+
+rule runHotspot_k_sensitivity_weighted:
+    input:
+        loom=data("data.loom"),
+        latent=rules.extractPositions.output.positions,
+    params:
+        model='bernoulli',
+        n_neighbors='{k}',
+        weighted_graph=True,
+    output:
+        results="k_sensitivity_weighted/k_{k}/hotspot.txt"
+    script: "../pipelineScripts/hotspot/runHotspot.py"
+
+
+rule runHotspot_k_sensitivity_weighted_all:
+    input:
+        expand(rules.runHotspot_k_sensitivity_weighted.output.results, k=k_values)

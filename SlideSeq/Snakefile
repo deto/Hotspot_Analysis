@@ -65,7 +65,6 @@ rule runHotspotPairs:
         fdrThresh=0.05,
         n_neighbors=30,
     output:
-        results_lc="hotspot/hotspot_pairs_lc.txt.gz",
         results_z="hotspot/hotspot_pairs_z.txt.gz"
     script: "../pipelineScripts/hotspot/runHotspotPairs.py"
 
@@ -80,7 +79,6 @@ rule runHotspotPairs_Puck12:
         fdrThresh=0.05,
         n_neighbors=30,
     output:
-        results_lc="hotspot/hotspot_pairs_lc_12.txt.gz",
         results_z="hotspot/hotspot_pairs_z_12.txt.gz"
     script: "../pipelineScripts/hotspot/runHotspotPairs.py"
 
@@ -141,6 +139,9 @@ rule vision:
     output:
         out="vision/vision.rds"
     script: "../pipelineScripts/Vision/vision.R"
+
+include: "Snakefile_nb"
+include: "Snakefile_k_sensitivity"
 
 rule all:
     input:
