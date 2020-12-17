@@ -36,3 +36,4 @@ SlideSeq/DropViz/DropSeq.util*
 *.mtx.gz
 *.xls.gz
 **/*_log*
+misc/*

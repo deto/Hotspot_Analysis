@@ -1,0 +1,232 @@
+subworkflow data:
+    workdir:
+        "../../data/Simulated6"
+
+data_file = "obs_counts/{seq_depth}/data.loom"
+gene_effect_file = "true_counts/gene_effects.txt"
+
+rule select_threshold:
+    input:
+        loom=data(data_file),
+    params:
+        N_CELLS=10,
+    output:
+        genes="{seq_depth}/genes/threshold.txt"
+    script: "pipelineScripts/select_threshold.py"
+
+rule select_for_pairs:
+    input:
+        ge_file=data(gene_effect_file),
+    output:
+        genes="{seq_depth}/genes/forPairs.txt"
+    script: "pipelineScripts/select_for_pairs.py"
+
+rule select_hvg:
+    input:
+        loom=data(data_file),
+    params:
+        lowXcutoff=0.1,
+        #highXMeanCutoff=20,
+    output:
+        genes="{seq_depth}/genes/hvg.txt",
+        geneInfo="{seq_depth}/genes/hvg_info.txt"
+    script: "pipelineScripts/select_hvg.R"
+
+rule select_danb:
+    input:
+        loom=data(data_file),
+    params:
+        #highXMeanCutoff=20,
+    output:
+        genes="{seq_depth}/genes/danb.txt",
+        geneInfo="{seq_depth}/genes/danb_info.txt"
+    script: "pipelineScripts/select_danb.R"
+
+rule PCA_threshold:
+    message: "Computing PCA on thresholded genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_threshold.output.genes,
+    params:
+        doStandardize=True,
+        doJackstraw=False,
+        num_pcs=5,
+    output:
+        latent="{seq_depth}/pca/pca_threshold.txt",
+        components="{seq_depth}/pca/pca_components.txt",
+    script: "pipelineScripts/pca/pca_sim.py"
+
+rule select_pca:
+    input:
+        components=rules.PCA_threshold.output.components,
+    output:
+        genes="{seq_depth}/genes/pca.txt",
+        geneInfo="{seq_depth}/genes/pca_info.txt"
+    script: "pipelineScripts/select_pca.py"
+
+rule SCVI:
+    message: "Computing SCVI on thresholded genes"
+    input:
+        loom=data(data_file),
+        genes=rules.select_threshold.output.genes,
+    params:
+        components=10,
+    output:
+        latent="{seq_depth}/scvi/threshold/latent.txt.gz",
+        model="{seq_depth}/scvi/threshold/model.pkl",
+    script: "pipelineScripts/scvi/scviTorch.py"
+
+rule TSNE:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.SCVI.output.latent,
+    output:
+        out="{seq_depth}/tsne/tsne.txt",
+    script: "pipelineScripts/tsne/tsne.py"
+
+rule UMAP:
+    message: "Computing UMAP"
+    input:
+        latent=rules.SCVI.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="{seq_depth}/umap/umap.txt",
+    script: "pipelineScripts/umap/umap.py"
+
+rule TSNE_pca:
+    message: "Computing TSNE - hvg genes"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    output:
+        out="{seq_depth}/tsne/tsne_pca.txt",
+    script: "pipelineScripts/tsne/tsne.py"
+
+rule UMAP_pca:
+    message: "Computing UMAP"
+    input:
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        n_neighbors=30,
+    output:
+        out="{seq_depth}/umap/umap_pca.txt",
+    script: "pipelineScripts/umap/umap.py"
+
+rule runHotspot_threshold:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI.output.latent,
+    params:
+        model='danb',
+        n_neighbors=30,
+        n_cells_min=10,
+    output:
+        results="{seq_depth}/hotspot/hotspot_threshold.txt"
+    script: "pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot_threshold_300:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI.output.latent,
+    params:
+        model='danb',
+        n_neighbors=300,
+        n_cells_min=10,
+        weighted_graph=True,
+    output:
+        results="{seq_depth}/hotspot/hotspot_threshold_300.txt"
+    script: "pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspot_threshold_pca:
+    input:
+        loom=data(data_file),
+        latent=rules.PCA_threshold.output.latent,
+    params:
+        model='danb',
+        n_neighbors=300,
+        n_cells_min=10,
+        weighted_graph=True,
+    output:
+        results="{seq_depth}/hotspot/hotspot_pca_threshold.txt"
+    script: "pipelineScripts/hotspot/runHotspot.py"
+
+rule runHotspotPairs:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI.output.latent,
+        hs_results=rules.runHotspot_threshold.output.results,
+        genes=rules.select_for_pairs.output.genes,
+    params:
+        model='danb',
+        fdrThresh=0.05,
+        # topN=500,
+        n_neighbors=30,
+        # highXMeanCutoff=20,
+    output:
+        results_z="{seq_depth}/hotspot/hotspot_pairs_z.txt.gz"
+    script: "pipelineScripts/hotspot/runHotspotPairs.py"
+
+rule runRegularPairs:
+    input:
+        loom=data(data_file),
+        latent=rules.SCVI.output.latent,
+        hs_results=rules.runHotspot_threshold.output.results,
+        genes=rules.select_for_pairs.output.genes,
+    params:
+        model='danb',
+        fdrThresh=0.05,
+        # topN=500,
+        n_neighbors=30,
+        # highXMeanCutoff=20,
+    output:
+        results_lc="{seq_depth}/hotspot/regular_pairs_lc.txt.gz",
+    script: "pipelineScripts/hotspot/runRegularPairs.py"
+
+rule extractHotspotModules:
+    input:
+        results_z=rules.runHotspotPairs.output.results_z,
+    params:
+        min_cluster_genes=15,
+        core_only=False,
+        # z_threshold=1.96,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="{seq_depth}/hotspot/module_heatmap.svg",
+        cluster_output="{seq_depth}/hotspot/modules.txt",
+        linkage_output="{seq_depth}/hotspot/linkage.txt",
+    script: "pipelineScripts/hotspot/extractHotspotModules.py"
+
+
+rule extractRegularModules:
+    input:
+        results_z=rules.runRegularPairs.output.results_lc,
+        latent=rules.SCVI.output.latent,
+    params:
+        min_cluster_genes=15,
+        core_only=False,
+        fdr_threshold=.05,
+    output:
+        cluster_heatmap="{seq_depth}/hotspot/module_heatmap_regular.svg",
+        cluster_output="{seq_depth}/hotspot/modules_regular.txt",
+        linkage_output="{seq_depth}/hotspot/linkage_regular.txt",
+    script: "pipelineScripts/hotspot/extractRegularModules.py"
+
+
+
+seq_depths = ["1e3", "2e3", "5e3", "10e3", "20e3", "40e3", "80e3", "160e3", "320e3"]
+
+rule all:
+    input:
+        expand(rules.UMAP.output.out, seq_depth=seq_depths),
+        expand(rules.TSNE.output.out, seq_depth=seq_depths),
+        expand(rules.runHotspot_threshold_300.output, seq_depth=seq_depths),
+        expand(rules.runHotspot_threshold_pca.output, seq_depth=seq_depths),
+        expand(rules.runHotspotPairs.output, seq_depth=seq_depths),
+        expand(rules.runRegularPairs.output, seq_depth=seq_depths),
+        expand(rules.extractHotspotModules.output, seq_depth=seq_depths),
+        expand(rules.extractRegularModules.output, seq_depth=seq_depths),
+        expand(rules.select_hvg.output, seq_depth=seq_depths),
+        expand(rules.select_danb.output, seq_depth=seq_depths),
+        expand(rules.select_pca.output, seq_depth=seq_depths),
+        expand(rules.TSNE_pca.output, seq_depth=seq_depths),
+        expand(rules.UMAP_pca.output, seq_depth=seq_depths),
